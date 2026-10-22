@@ -98,9 +98,10 @@ happens once on a PC (PyTorch, on the WM-811K wafer-map dataset), followed by co
 `make_vectors.py` packs those integers into `model.bin`, and the host streams them to the chip with each
 computation. A different trained model needs only new vector files, not a different chip.
 
-To make vectors from a new model, export it from the main project with `model/export_demo_data.py`, then:
+Training and quantization are in `model/` (see `model/README.md`). To make vectors from a trained model:
 
 ```
+python model/export_demo_data.py --data DATA.npz --run RUN_DIR --out demo_data.npz
 python host/make_vectors.py --demo demo_data.npz --out host/vectors --per-class 1
 ```
 

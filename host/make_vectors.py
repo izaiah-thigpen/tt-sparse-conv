@@ -2,7 +2,7 @@
 
     python make_vectors.py --demo demo_data.npz --out vectors --per-class 1
 
---demo is the file written by model/export_demo_data.py in the main project:
+--demo is the file written by model/export_demo_data.py:
 the quantized weights (quant_params.npz contents), test wafer maps, labels and
 class names. Every expected value comes from test/refmodel.py, the integer
 model the chip RTL is verified against.
