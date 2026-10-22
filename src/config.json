@@ -31,6 +31,10 @@
   "//": "https://tinytapeout.com/faq/#how-can-i-map-an-additional-external-clock-to-one-of-the-gpios",
   "CLOCK_PORT": "clk",
 
+  "//": "Repair slew and timing at the slow corner as well as typical, so fanout",
+  "//": "buffers are sized for the slow corner (was: typical corner only).",
+  "RSZ_CORNERS": ["nom_tt_025C_1v80", "nom_ss_100C_1v60", "nom_ff_n40C_1v95"],
+
   "//": "Configuration docs: https://librelane.readthedocs.io/en/latest/reference/configuration.html",
 
   "//": "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!",
