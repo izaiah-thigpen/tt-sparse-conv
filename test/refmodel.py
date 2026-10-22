@@ -184,3 +184,38 @@ def run_network(x: np.ndarray, q: dict, return_intermediate: bool = False):
         return logits, {"conv1_in": a0, "conv1_out": c1, "conv2_in": p1, "conv2_out": c2,
                         "acc_peak": (peak1, peak2)}
     return logits
+
+# --------------------------------------------------------------------------
+# Activity mode (SET_ACTIVITY / RUN): one generated tap per clock
+# --------------------------------------------------------------------------
+
+ACT_SEED = 0x2545F491
+
+
+def xorshift32(s):
+    s ^= (s << 13) & 0xFFFFFFFF
+    s ^= s >> 17
+    s ^= (s << 5) & 0xFFFFFFFF
+    return s
+
+
+def activity_pixel(state, threshold):
+    """Pixel for one activity tap: 0 when the top byte is below the threshold,
+    otherwise the low byte with its lowest bit forced to 1."""
+    return 0 if (state >> 24) < threshold else ((state & 0xFE) | 1)
+
+
+def activity_run(weights9, n_taps, threshold, acc=0, skips=0):
+    """The chip's state after an activity run of n_taps from a fresh RUN.
+    The accumulator wraps at 24 bits and the skip counter saturates at 65,535,
+    as in the hardware. Returns (accumulator, skip count)."""
+    w = [int(x) for x in weights9]
+    s = ACT_SEED
+    for k in range(n_taps):
+        p, wk = activity_pixel(s, threshold), w[k % 9]
+        if p == 0 or wk == 0:
+            skips = min(skips + 1, 0xFFFF)
+        else:
+            acc = ((acc + p * wk + (1 << (ACC_BITS - 1))) % (1 << ACC_BITS)) - (1 << (ACC_BITS - 1))
+        s = xorshift32(s)
+    return acc, skips

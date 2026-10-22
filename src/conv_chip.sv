@@ -20,7 +20,20 @@
 //   0x21 READ_ACC       3 bytes out   raw accumulator, MSB first
 //   0x22 READ_SKIPS     2 bytes out   skip counter, MSB first
 //   0x23 CLEAR_SKIPS    none
+//   0x30 SET_ACTIVITY   1 byte in     zero threshold T for activity mode (0-255)
+//   0x31 RUN            3 bytes in    activity mode: N taps, MSB first; N = 0 runs until STOP
+//   0x32 STOP           none          ends an activity run
 //   0x7F READ_ID        1 byte out    0xA5
+//
+// Activity mode (for measuring the gating's energy saving on silicon): the
+// multiplier takes one tap every clock, with no SPI traffic. Pixels come from
+// an xorshift32 generator seeded with 0x2545F491 at each RUN: a pixel is 0 when
+// the state's top byte is below T (a share of about T/256), otherwise
+// {state[7:1], 1}. Weights cycle through the nine loaded weights, starting at
+// weight 0. The generator advances after every tap. Load the accumulator and
+// clear the skip counter first; BUSY is high while running and DONE rises when
+// it ends. Gating and BYPASS apply as usual, so the same run can be measured
+// gated and ungated. Do not send COMPUTE during a run.
 //
 // For a read, the response comes out on MISO during the bytes that follow the
 // opcode; the host sends dummy bytes (0x00) to clock it out.
@@ -45,8 +58,8 @@ module conv_chip #(
 
     input  logic       bypass,      // 1 = gating off, regardless of config
 
-    output logic       done,        // high after a COMPUTE finishes, until the next starts
-    output logic       busy,        // high from a COMPUTE opcode until it finishes
+    output logic       done,        // high after a COMPUTE or activity run finishes, until the next starts
+    output logic       busy,        // high during a COMPUTE or an activity run
     output logic       skip,        // high one cycle per zero tap (scope probe)
     output logic [3:0] tap          // tap index within the current COMPUTE (debug)
 );
@@ -59,8 +72,12 @@ module conv_chip #(
     localparam logic [7:0] OP_READ_ACC      = 8'h21;
     localparam logic [7:0] OP_READ_SKIPS    = 8'h22;
     localparam logic [7:0] OP_CLEAR_SKIPS   = 8'h23;
+    localparam logic [7:0] OP_SET_ACTIVITY  = 8'h30;
+    localparam logic [7:0] OP_RUN           = 8'h31;
+    localparam logic [7:0] OP_STOP          = 8'h32;
     localparam logic [7:0] OP_READ_ID       = 8'h7F;
     localparam logic [7:0] CHIP_ID          = 8'hA5;
+    localparam logic [31:0] ACT_SEED        = 32'h2545F491;
 
     // ------------------------------------------------------------------
     // Input synchronizers (SPI pins and BYPASS are asynchronous to clk)
@@ -147,7 +164,7 @@ module conv_chip #(
     // Command decoder
     // ------------------------------------------------------------------
     typedef enum logic [2:0] {
-        S_IDLE, S_WEIGHTS, S_LOAD_ACC, S_CONFIG, S_COMPUTE, S_READ
+        S_IDLE, S_WEIGHTS, S_LOAD_ACC, S_CONFIG, S_COMPUTE, S_READ, S_ACT_CFG, S_RUN_CNT
     } state_t;
 
     state_t            state;
@@ -158,6 +175,23 @@ module conv_chip #(
     logic              cfg_gate;
     logic       [15:0] resp_buf;       // response bytes still to send
     logic        [1:0] resp_left;      // response bytes the host will clock
+
+    // Activity mode
+    logic        [7:0] act_thresh;     // pixel is zero when rng[31:24] < act_thresh
+    logic              running;
+    logic              run_forever;    // RUN with N = 0: until STOP
+    logic       [23:0] run_left;       // taps still to issue
+    logic       [31:0] rng;            // xorshift32 state
+    logic        [3:0] widx;           // weight used by the next activity tap
+    logic       [31:0] rng_a, rng_b, rng_next;
+    logic        [7:0] act_pixel;
+    logic              run_start;
+
+    assign rng_a     = rng   ^ (rng   << 13);
+    assign rng_b     = rng_a ^ (rng_a >> 17);
+    assign rng_next  = rng_b ^ (rng_b << 5);
+    assign act_pixel = (rng[31:24] < act_thresh) ? 8'd0 : {rng[7:1], 1'b1};
+    assign run_start = byte_done && !cs_end && (state == S_RUN_CNT) && (idx == 4'd2);
 
     // Signals into mac_core, registered here
     logic                    mac_load;
@@ -197,6 +231,12 @@ module conv_chip #(
             mac_clear_skips <= 1'b0;
             last_tap        <= 1'b0;
             busy            <= 1'b0;
+            act_thresh      <= '0;
+            running         <= 1'b0;
+            run_forever     <= 1'b0;
+            run_left        <= '0;
+            rng             <= ACT_SEED;
+            widx            <= '0;
         end else begin
             // One-cycle strobes
             mac_load        <= 1'b0;
@@ -223,6 +263,14 @@ module conv_chip #(
                                 busy  <= 1'b1;
                             end
                             OP_CLEAR_SKIPS:   mac_clear_skips <= 1'b1;
+                            OP_SET_ACTIVITY:  state <= S_ACT_CFG;
+                            OP_RUN:           state <= S_RUN_CNT;
+                            OP_STOP: begin
+                                if (running) begin
+                                    running  <= 1'b0;
+                                    last_tap <= 1'b1;
+                                end
+                            end
                             OP_READ_RESULT: begin
                                 tx_next   <= mac_result;
                                 resp_left <= 2'd1;
@@ -284,6 +332,26 @@ module conv_chip #(
                         end
                     end
 
+                    S_ACT_CFG: begin
+                        act_thresh <= rx_byte;
+                        state      <= S_IDLE;
+                    end
+
+                    S_RUN_CNT: begin
+                        idx <= idx + 4'd1;
+                        if (idx == 4'd2) begin
+                            run_left    <= {acc_buf, rx_byte};
+                            run_forever <= ({acc_buf, rx_byte} == 24'd0);
+                            running     <= 1'b1;
+                            rng         <= ACT_SEED;
+                            widx        <= '0;
+                            busy        <= 1'b1;
+                            state       <= S_IDLE;
+                        end else begin
+                            acc_buf <= {acc_buf[7:0], rx_byte};
+                        end
+                    end
+
                     S_READ: begin
                         // The byte just received was a dummy byte that clocked
                         // out one response byte; queue the next one
@@ -300,6 +368,23 @@ module conv_chip #(
                 endcase
             end
 
+            // Activity mode: one generated tap per clock. Placed after the
+            // command decoder so it takes priority over SPI taps.
+            if (running) begin
+                mac_tap_valid <= 1'b1;
+                mac_pixel     <= act_pixel;
+                mac_weight    <= w[widx];
+                widx          <= (widx == 4'd8) ? 4'd0 : widx + 4'd1;
+                rng           <= rng_next;
+                if (!run_forever) begin
+                    run_left <= run_left - 24'd1;
+                    if (run_left == 24'd1) begin
+                        running  <= 1'b0;
+                        last_tap <= 1'b1;
+                    end
+                end
+            end
+
             // DONE goes high once the last tap has reached the accumulator
             if (done_pipe[1]) busy <= 1'b0;
         end
@@ -312,14 +397,14 @@ module conv_chip #(
             done      <= 1'b0;
         end else begin
             done_pipe <= {done_pipe[0], last_tap};
-            if (state == S_IDLE && byte_done && rx_byte == OP_COMPUTE)
+            if ((state == S_IDLE && byte_done && rx_byte == OP_COMPUTE) || run_start)
                 done <= 1'b0;
             else if (done_pipe[1])
                 done <= 1'b1;
         end
     end
 
-    assign tap = (state == S_COMPUTE) ? idx : 4'd0;
+    assign tap = (state == S_COMPUTE) ? idx : (running ? widx : 4'd0);
 
     // ------------------------------------------------------------------
     // The multiply-accumulate core

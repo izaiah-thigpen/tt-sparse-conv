@@ -26,6 +26,9 @@ READ_RESULT = 0x20
 READ_ACC = 0x21
 READ_SKIPS = 0x22
 CLEAR_SKIPS = 0x23
+SET_ACTIVITY = 0x30
+RUN = 0x31
+STOP = 0x32
 READ_ID = 0x7F
 CHIP_ID = 0xA5
 
@@ -95,6 +98,24 @@ def read_id():
     return bytes([READ_ID, 0])
 
 
+def set_activity(threshold):
+    """Activity-mode zero threshold: about threshold/256 of generated pixels are 0."""
+    if not 0 <= threshold <= 255:
+        raise ValueError("threshold out of range: %d" % threshold)
+    return bytes([SET_ACTIVITY, threshold])
+
+
+def run(n_taps):
+    """Activity run of n_taps (one per clock); 0 runs until STOP."""
+    if not 0 <= n_taps <= 0xFFFFFF:
+        raise ValueError("tap count out of range: %d" % n_taps)
+    return bytes([RUN, (n_taps >> 16) & 0xFF, (n_taps >> 8) & 0xFF, n_taps & 0xFF])
+
+
+def stop():
+    return bytes([STOP])
+
+
 def value_frame(groups, bias):
     """One output value in one frame: LOAD_ACC, then WRITE_WEIGHTS + COMPUTE
     per input channel, then READ_RESULT. groups = [(pixels9, weights9), ...].
@@ -150,6 +171,42 @@ def output_stage(acc, shift):
     """Arithmetic shift right (rounds toward -infinity), then clamp to 0..255."""
     v = acc >> shift
     return 0 if v < 0 else (255 if v > 255 else v)
+
+
+ACT_SEED = 0x2545F491
+
+
+def xorshift32(s):
+    s ^= (s << 13) & 0xFFFFFFFF
+    s ^= s >> 17
+    s ^= (s << 5) & 0xFFFFFFFF
+    return s
+
+
+def activity_run(weights9, n_taps, threshold, acc=0, skips=0):
+    """Accumulator and skip count after an activity run of n_taps (same as
+    test/refmodel.py). The accumulator wraps at 24 bits; the skip counter
+    saturates at 65,535."""
+    w = list(weights9)
+    s = ACT_SEED
+    half = 1 << (ACC_BITS - 1)
+    for k in range(n_taps):
+        p = 0 if (s >> 24) < threshold else ((s & 0xFE) | 1)
+        wk = w[k % 9]
+        if p == 0 or wk == 0:
+            if skips < 0xFFFF:
+                skips += 1
+        else:
+            acc = ((acc + p * wk + half) % (2 * half)) - half
+        s = xorshift32(s)
+    return acc, skips
+
+
+def zero_share(weights9, threshold):
+    """Expected share of skipped taps in a long activity run."""
+    p0 = threshold / 256
+    wz = sum(1 for w in weights9 if w == 0) / 9
+    return p0 + (1 - p0) * wz
 
 
 def window(img, h, w, r, c):

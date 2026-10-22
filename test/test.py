@@ -112,6 +112,15 @@ class ChipHost:
     async def clear_skips(self):
         await self.spi.xfer([0x23])
 
+    async def set_activity(self, threshold):
+        await self.spi.xfer([0x30, threshold])
+
+    async def run(self, n_taps):
+        await self.spi.xfer([0x31, (n_taps >> 16) & 0xFF, (n_taps >> 8) & 0xFF, n_taps & 0xFF])
+
+    async def stop(self):
+        await self.spi.xfer([0x32])
+
     async def output_value(self, groups, bias, shift, gate=1):
         await self.write_config(shift, gate)
         await self.load_acc(bias)
@@ -243,3 +252,81 @@ async def spi_clock_ratios(dut):
     pins, _ = await setup(dut)
     for ratio in (8, 10, 16):
         await check_value(ChipHost(Spi(pins, ratio)), groups, -1234, 6, 1, f"ratio {ratio}")
+
+
+async def wait_done(dut, pins, max_cycles):
+    for _ in range(max_cycles):
+        if pins.get(DONE) and not pins.get(BUSY):
+            return
+        await ClockCycles(dut.clk, 1)
+    raise AssertionError("activity run did not finish")
+
+
+async def activity_check(dut, pins, host, weights, bias, threshold, n_taps, gate, label):
+    await host.write_weights(weights)
+    await host.write_config(0, gate)
+    await host.load_acc(bias)
+    await host.clear_skips()
+    await host.set_activity(threshold)
+    await host.run(n_taps)
+    assert pins.get(BUSY) == 1 or n_taps < 40, f"{label}: BUSY not high during the run"
+    await wait_done(dut, pins, n_taps + 200)
+    want_acc, want_skips = rm.activity_run(weights, n_taps, threshold, acc=bias)
+    acc, skips = await host.read_acc(), await host.read_skips()
+    assert acc == want_acc, f"{label}: acc {acc} != model {want_acc}"
+    assert skips == want_skips, f"{label}: skips {skips} != model {want_skips}"
+    return skips
+
+
+@cocotb.test()
+async def activity_runs(dut):
+    """Activity mode: generated taps at several zero thresholds, gated, ungated and BYPASS."""
+    pins, host = await setup(dut)
+    rng = random.Random(9)
+    n = 300 if GATE_LEVEL else 900
+    for threshold in (0, 64, 128, 230, 255):
+        weights = [rng.randint(-127, 127) for _ in range(9)]
+        weights[rng.randint(0, 8)] = 0
+        for gate, bypass in ((1, 0), (0, 0), (1, 1)):
+            pins.set(BYPASS, bypass)
+            await activity_check(dut, pins, host, weights, rng.randint(-50000, 50000), threshold, n, gate,
+                                 f"T={threshold} gate={gate} bypass={bypass}")
+    pins.set(BYPASS, 0)
+    assert await host.read_id() == 0xA5, "SPI broken after activity runs"
+
+
+@cocotb.test()
+async def activity_wrap_and_saturate(dut):
+    """Long runs: the accumulator wraps at 24 bits and the skip counter saturates."""
+    pins, host = await setup(dut)
+    n = 70000
+    await activity_check(dut, pins, host, [127] * 9, 0, 0, n, 1, "wrap")
+    skips = await activity_check(dut, pins, host, [127] * 9, 0, 255, n, 1, "saturate")
+    assert skips == 0xFFFF
+
+
+@cocotb.test()
+async def activity_until_stop(dut):
+    """RUN 0 runs until STOP; the taps executed match the model for some count."""
+    pins, host = await setup(dut)
+    weights = [3, -7, 0, 11, 25, -1, 9, 4, -60]
+    await host.write_weights(weights)
+    await host.write_config(0, 1)
+    await host.load_acc(0)
+    await host.clear_skips()
+    await host.set_activity(100)
+    await host.run(0)
+    await ClockCycles(dut.clk, 500)
+    assert pins.get(BUSY) == 1 and pins.get(DONE) == 0, "not running"
+    await host.stop()
+    await ClockCycles(dut.clk, 10)
+    assert pins.get(BUSY) == 0 and pins.get(DONE) == 1, "did not stop"
+    acc, skips = await host.read_acc(), await host.read_skips()
+    await ClockCycles(dut.clk, 100)
+    assert (await host.read_acc(), await host.read_skips()) == (acc, skips), "kept running after STOP"
+    for n in range(400, 3000):
+        if rm.activity_run(weights, n, 100) == (acc, skips):
+            dut._log.info(f"stopped after {n} taps")
+            break
+    else:
+        raise AssertionError(f"acc {acc}, skips {skips} match no run length")
