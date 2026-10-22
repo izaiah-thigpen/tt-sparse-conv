@@ -31,9 +31,11 @@
   "//": "https://tinytapeout.com/faq/#how-can-i-map-an-additional-external-clock-to-one-of-the-gpios",
   "CLOCK_PORT": "clk",
 
-  "//": "Repair slew and timing at the slow corner as well as typical, so fanout",
-  "//": "buffers are sized for the slow corner (was: typical corner only).",
-  "RSZ_CORNERS": ["nom_tt_025C_1v80", "nom_ss_100C_1v60", "nom_ff_n40C_1v95"],
+  "//": "Keep the slow clkdlybuf4s* delay cells out of placement and routing, so the",
+  "//": "resizer splits high-fanout nets with real buffers. Left unrestricted, it used",
+  "//": "clkdlybuf4s25_1 for all fanout buffers, causing 552 slow-corner slew warnings.",
+  "//": "Hold fixing still has dlygate4sd* delay cells.",
+  "EXTRA_EXCLUDED_CELLS": ["sky130_fd_sc_hd__clkdlybuf4s*"],
 
   "//": "Configuration docs: https://librelane.readthedocs.io/en/latest/reference/configuration.html",
 
