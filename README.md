@@ -18,6 +18,13 @@ classifier: on the trained network, 77% of taps have a zero operand.
 | `src/mac_core.sv` | Multiply-accumulate core, zero-skip gating, skip counter, output stage |
 | `test/test.py` | cocotb tests through the pins only, checked against `test/refmodel.py` |
 | `test/refmodel.py` | Bit-exact integer model of the design |
+| `test/test_host.py` | Runs the demo-board test program against the design |
+| `host/` | Test kit for the fabricated chip: data-to-SPI converter, demo-board test program, test vectors ([guide](host/README.md)) |
+
+## Testing the fabricated chip
+
+See [host/README.md](host/README.md): copy four files and a folder to the Tiny Tapeout demo board and run
+one command. It reports PASS or FAIL for every check.
 
 ## Run the tests locally
 

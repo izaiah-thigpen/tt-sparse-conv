@@ -36,14 +36,26 @@ ignored. For reads, send 0x00 dummy bytes after the opcode to clock out the resp
 
 ## How to test
 
-1. Reset the chip, then send `7F 00` with chip select low. The second byte read back should be `A5`.
-2. Compute one value: send `03 10` (shift 0, gating on), `02 00 00 00` (zero the accumulator),
-   `01` followed by nine weights, `10` followed by nine pixels, then `20 00`. The second byte read
-   back is the result.
-3. Example: weights all 1 and pixels 1 to 9 give 45.
-4. Watch SKIP (uo[2]) on a scope while computing with some zero pixels: it pulses once per zero tap.
-   Read the count back with `22 00 00`.
-5. Repeat with BYPASS (ui[3]) high: the result is the same; only switching activity differs.
+The `host/` folder of the repository has a complete test kit; see `host/README.md`. In short, with the
+chip on a Tiny Tapeout demo board:
+
+```
+pip install mpremote
+mpremote fs cp host/chip_protocol.py host/board/tt_spi.py host/board/bringup.py :
+mpremote fs cp -r host/vectors :
+mpremote run host/board/bringup.py
+```
+
+The RP2040 then runs smoke tests (chip ID, hand-checked values, gating on and off) and the convolution
+layers of a stored network, comparing every output with precomputed values, and prints PASS or FAIL.
+
+To test by hand: reset the chip, then send `7F 00` with chip select low. The second byte read back should
+be `A5`. Then send `03 10` (shift 0, gating on), `02 00 00 00` (zero the accumulator), `01` followed by
+nine weights, `10` followed by nine pixels, and `20 00`; the second byte read back is the result. With
+weights all 1 and pixels 1 to 9, the result is 45. `host/spi_convert.py` prints the bytes for any output.
+
+Watch SKIP (uo[2]) on a scope while computing with some zero pixels: it pulses once per skipped multiply.
+With BYPASS (ui[3]) high the results are the same; only the switching activity differs.
 
 ## External hardware
 
