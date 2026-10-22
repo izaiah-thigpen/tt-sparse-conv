@@ -1,20 +1,51 @@
-<!---
-
-This file is used to generate your project datasheet. Please fill in the information below and delete any unused
-sections.
-
-You can also include images in this folder and reference them in the markdown. Each image must be less than
-512 kb in size, and the combined size of all images must be less than 1 MB.
--->
-
 ## How it works
 
-Explain how your project works
+This is the compute core of a small neural-network accelerator for wafer-map defect
+classification. It computes one output value of a 3×3 convolution at a time:
+nine signed 8-bit weights times nine unsigned 8-bit pixels, added into a 24-bit
+accumulator that can be preloaded with a bias and chained across up to 16 input
+channels. The result is shifted right by a per-kernel amount and clamped to 0–255.
+
+Its distinguishing feature is **zero-skip gating**. When a pixel or weight is zero,
+the multiplier's input registers hold their previous values and the accumulator
+does not update, so the multiplier does not switch for that tap. The result is
+identical either way. A skip counter records how many taps were skipped, and the
+BYPASS pin turns the gating off so the same data can be compared on the same chip.
+On the trained wafer-map network, 77% of taps have a zero operand.
+
+The core takes one tap per clock in a two-stage pipeline (operand registers, then
+multiply-accumulate). All commands arrive over SPI.
+
+### SPI commands
+
+SPI mode 0, most significant bit first. The system clock must be at least 8× SCLK.
+Several commands may share one chip-select frame; unknown bytes (including 0x00) are
+ignored. For reads, send 0x00 dummy bytes after the opcode to clock out the response.
+
+| Opcode | Command | Data | Effect |
+| --- | --- | --- | --- |
+| 0x01 | WRITE_WEIGHTS | 9 bytes in | Nine signed weights, row-major |
+| 0x02 | LOAD_ACC | 3 bytes in | Accumulator preload (bias), MSB first |
+| 0x03 | WRITE_CONFIG | 1 byte in | Bits 3:0 shift, bit 4 gating enable (on after reset) |
+| 0x10 | COMPUTE | 9 bytes in | Nine pixels; adds nine products, then raises DONE |
+| 0x20 | READ_RESULT | 1 byte out | (accumulator >>> shift) clamped to 0–255 |
+| 0x21 | READ_ACC | 3 bytes out | Raw accumulator, MSB first |
+| 0x22 | READ_SKIPS | 2 bytes out | Zero-operand tap count, MSB first |
+| 0x23 | CLEAR_SKIPS | none | Zeroes the skip counter |
+| 0x7F | READ_ID | 1 byte out | Always 0xA5 |
 
 ## How to test
 
-Explain how to use your project
+1. Reset the chip, then send `7F 00` with chip select low. The second byte read back should be `A5`.
+2. Compute one value: send `03 10` (shift 0, gating on), `02 00 00 00` (zero the accumulator),
+   `01` followed by nine weights, `10` followed by nine pixels, then `20 00`. The second byte read
+   back is the result.
+3. Example: weights all 1 and pixels 1 to 9 give 45.
+4. Watch SKIP (uo[2]) on a scope while computing with some zero pixels: it pulses once per zero tap.
+   Read the count back with `22 00 00`.
+5. Repeat with BYPASS (ui[3]) high: the result is the same; only switching activity differs.
 
 ## External hardware
 
-List external hardware used in your project (e.g. PMOD, LED display, etc), if any
+An SPI host, such as a microcontroller or a PYNQ FPGA board, on ui[0..2] and uo[0].
+Optionally an oscilloscope on SKIP (uo[2]) and DONE (uo[1]).

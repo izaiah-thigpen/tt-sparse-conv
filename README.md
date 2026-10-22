@@ -1,42 +1,35 @@
 ![](../../workflows/gds/badge.svg) ![](../../workflows/docs/badge.svg) ![](../../workflows/test/badge.svg) ![](../../workflows/fpga/badge.svg)
 
-# Tiny Tapeout Verilog Project Template
+# Sparsity-Aware Convolution Core
 
-- [Read the documentation for project](docs/info.md)
+An 8-bit 3×3 convolution multiply-accumulate core for Tiny Tapeout (SkyWater 130 nm),
+controlled over SPI. It skips the switching work of any tap whose pixel or weight is
+zero, and counts how many it skipped. It is the silicon half of a wafer-map defect
+classifier: on the trained network, 77% of taps have a zero operand.
 
-## What is Tiny Tapeout?
+- [Datasheet: how it works and how to test](docs/info.md)
 
-Tiny Tapeout is an educational project that aims to make it easier and cheaper than ever to get your digital and analog designs manufactured on a real chip.
+## Layout
 
-To learn more and get started, visit https://tinytapeout.com.
+| Path | Contents |
+| --- | --- |
+| `src/project.v` | Tiny Tapeout top level (`tt_um_izaiah_thigpen_sparse_conv`) |
+| `src/conv_chip.sv` | SPI interface, command decoder, weight registers |
+| `src/mac_core.sv` | Multiply-accumulate core, zero-skip gating, skip counter, output stage |
+| `test/test.py` | cocotb tests through the pins only, checked against `test/refmodel.py` |
+| `test/refmodel.py` | Bit-exact integer model of the design |
 
-## Set up your Verilog project
+## Run the tests locally
 
-1. Add your Verilog files to the `src` folder.
-2. Edit the [info.yaml](info.yaml) and update information about your project, paying special attention to the `source_files` and `top_module` properties. If you are upgrading an existing Tiny Tapeout project, check out our [online info.yaml migration tool](https://tinytapeout.github.io/tt-yaml-upgrade-tool/).
-3. Edit [docs/info.md](docs/info.md) and add a description of your project.
-4. Adapt the testbench to your design. See [test/README.md](test/README.md) for more information.
+```
+cd test
+make
+```
 
-The GitHub action will automatically build the ASIC files using [LibreLane](https://www.zerotoasiccourse.com/terminology/librelane/).
+Needs Icarus Verilog and `pip install -r test/requirements.txt`.
 
-## Enable GitHub actions to build the results page
+## GitHub Actions
 
-- [Enabling GitHub Pages](https://tinytapeout.com/faq/#my-github-action-is-failing-on-the-pages-part)
-
-## Resources
-
-- [FAQ](https://tinytapeout.com/faq/)
-- [Digital design lessons](https://tinytapeout.com/digital_design/)
-- [Learn how semiconductors work](https://tinytapeout.com/siliwiz/)
-- [Join the community](https://tinytapeout.com/discord)
-- [Build your design locally](https://www.tinytapeout.com/guides/local-hardening/)
-
-## What next?
-
-- [Submit your design to the next shuttle](https://app.tinytapeout.com/).
-- Edit [this README](README.md) and explain your design, how it works, and how to test it.
-- Share your project on your social network of choice:
-  - LinkedIn [#tinytapeout](https://www.linkedin.com/search/results/content/?keywords=%23tinytapeout) [@TinyTapeout](https://www.linkedin.com/company/100708654/)
-  - Mastodon [#tinytapeout](https://chaos.social/tags/tinytapeout) [@matthewvenn](https://chaos.social/@matthewvenn)
-  - X (formerly Twitter) [#tinytapeout](https://twitter.com/hashtag/tinytapeout) [@tinytapeout](https://twitter.com/tinytapeout)
-  - Bluesky [@tinytapeout.com](https://bsky.app/profile/tinytapeout.com)
+Every push runs the RTL tests, builds the layout with LibreLane, runs Tiny Tapeout's
+precheck, reruns the tests on the gate-level netlist, and publishes a layout viewer.
+The viewer needs GitHub Pages enabled: Settings → Pages → Source: GitHub Actions.
