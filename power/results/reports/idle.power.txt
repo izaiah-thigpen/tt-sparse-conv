@@ -1,0 +1,18 @@
+Warning 1171: /tmp/claude-0/pdk/lib/sky130_fd_sc_hd__tt_025C_1v80.lib line 23, default_fanout_load is 0.0.
+Annotated 7551 pin activities.
+Group                    Internal    Switching      Leakage        Total
+                            Power        Power        Power        Power (Watts)
+------------------------------------------------------------------------
+Sequential           7.091163e-04 0.000000e+00 4.506294e-09 7.091208e-04 100.0%
+Combinational        0.000000e+00 0.000000e+00 3.830362e-09 3.830362e-09   0.0%
+Clock                0.000000e+00 0.000000e+00 0.000000e+00 0.000000e+00   0.0%
+Macro                0.000000e+00 0.000000e+00 0.000000e+00 0.000000e+00   0.0%
+Pad                  0.000000e+00 0.000000e+00 0.000000e+00 0.000000e+00   0.0%
+------------------------------------------------------------------------
+Total                7.091163e-04 0.000000e+00 8.336674e-09 7.091247e-04 100.0%
+                           100.0%         0.0%         0.0%
+MAC_BEGIN
+     Internal    Switching      Leakage        Total
+        Power        Power        Power        Power (Watts)
+----------------------------------------------------
+ 1.196094e-04 0.000000e+00 2.484929e-09 1.196119e-04 u_chip/u_mac

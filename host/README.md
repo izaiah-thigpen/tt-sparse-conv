@@ -15,6 +15,7 @@ commands, sends them, and checks every reply against values precomputed by the r
 | `make_vectors.py` | PC | Writes `vectors/` from a trained model |
 | `spi_convert.py` | PC | Prints the exact SPI bytes for any single output, for use with any SPI adapter or logic analyzer |
 | `tests/` | PC | A software model of the chip, to run the board program without hardware |
+| `../power/` | PC | Gate-level power simulation of the same sweep, the prediction for the measurement |
 
 ## Testing a chip
 
@@ -51,8 +52,28 @@ selected, and the clock is running.
 **Optional measurements:**
 - `uo_out[2]` (SKIP) pulses once per skipped multiply; on a scope it shows the zero-skip gating working.
 - `ui_in[3]` (BYPASS) high turns gating off. Results must not change; only the switching activity does.
-- Comparing the chip's supply current with BYPASS low and high, on the same data, measures the
-  energy the gating saves.
+
+## Measuring the energy saving (activity mode)
+
+This is the measurement for a paper. Over SPI the chip computes at most one tap per byte, so its
+current barely changes with the data. The activity mode (`SET_ACTIVITY`, `RUN`, `STOP`) instead runs
+the multiplier every clock on generated pixels, a chosen share of them zero, so the gating's saving
+shows up in the supply current.
+
+1. Put a current meter (or a sense resistor and a scope) on the chip's supply. Keep the clock fixed.
+2. Run the guided sweep, pressing Enter after recording each reading:
+
+   ```
+   mpremote exec "import bringup; bringup.power_sweep()"
+   ```
+
+   It steps through idle, then zero shares of 0, 25, 50, 75 and 90%, each gated and with BYPASS high.
+   For a logging meter, `bringup.power_sweep(hold_s=10)` holds each step 10 seconds instead.
+3. `mpremote fs cp :power_sweep.csv .` retrieves the step list; add the currents to its last column.
+
+The quick test already checks that activity runs give exactly the model's accumulator and skip count, so a
+passing quick test means the generator and gating work before any current is measured. The simulated
+prediction to compare against is in `power/results/power.md`.
 
 ## How data becomes SPI
 

@@ -32,7 +32,23 @@ ignored. For reads, send 0x00 dummy bytes after the opcode to clock out the resp
 | 0x21 | READ_ACC | 3 bytes out | Raw accumulator, MSB first |
 | 0x22 | READ_SKIPS | 2 bytes out | Zero-operand tap count, MSB first |
 | 0x23 | CLEAR_SKIPS | none | Zeroes the skip counter |
+| 0x30 | SET_ACTIVITY | 1 byte in | Activity-mode zero threshold T (0–255) |
+| 0x31 | RUN | 3 bytes in | Activity run of N taps, MSB first; N = 0 runs until STOP |
+| 0x32 | STOP | none | Ends an activity run |
 | 0x7F | READ_ID | 1 byte out | Always 0xA5 |
+
+### Activity mode (for measuring the gating's energy saving)
+
+Over SPI the core gets at most one tap per byte, so it is idle most of the time and the
+gating's effect on supply current is too small to measure. RUN feeds the core one tap per
+clock from an on-chip generator instead: a 32-bit xorshift sequence (seed 0x2545F491) makes
+each pixel, zero when its top byte is below T (about T/256 of taps), otherwise an odd
+nonzero value; the weights cycle through the nine loaded weights. BUSY is high during a run
+and DONE rises when it ends. The accumulator wraps at 24 bits and the skip counter
+saturates at 65,535; both match a software model exactly, so a run is also a self-check.
+Comparing supply current with BYPASS low and high, at several thresholds, measures the
+energy saved per skipped tap. Gate-level simulation predicts the multiply-accumulate unit's
+dynamic power falls by 23% at 50% zero taps and by 66% at 90% (see `power/` in the repository).
 
 ## How to test
 
@@ -57,7 +73,12 @@ weights all 1 and pixels 1 to 9, the result is 45. `host/spi_convert.py` prints 
 Watch SKIP (uo[2]) on a scope while computing with some zero pixels: it pulses once per skipped multiply.
 With BYPASS (ui[3]) high the results are the same; only the switching activity differs.
 
+To measure the energy saving, run `mpremote exec "import bringup; bringup.power_sweep()"` with
+a meter on the chip's supply: it steps through idle and five zero shares, gated and with BYPASS,
+and writes the steps to `power_sweep.csv` for the readings.
+
 ## External hardware
 
 An SPI host, such as a microcontroller or a PYNQ FPGA board, on ui[0..2] and uo[0].
-Optionally an oscilloscope on SKIP (uo[2]) and DONE (uo[1]).
+Optionally an oscilloscope on SKIP (uo[2]) and DONE (uo[1]), and a current meter on the
+project supply for the activity-mode power measurement.

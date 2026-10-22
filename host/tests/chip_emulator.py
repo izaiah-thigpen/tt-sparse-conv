@@ -12,6 +12,9 @@ select abandons a command (LOAD_ACC and WRITE_CONFIG only apply when complete).
 SCLK, CS_N, MOSI, BYPASS = 0x01, 0x02, 0x04, 0x08
 
 
+import chip_protocol as cp
+
+
 class ChipEmulator:
     def __init__(self):
         self.ui = CS_N
@@ -23,10 +26,15 @@ class ChipEmulator:
         self.done = False
         self.busy = False
         self.pin_writes = 0
+        self.act_thresh = 0
+        self.running = False
+        self._run_start_writes = 0
         self._reset_frame()
         self.tx = 0
 
     def _reset_frame(self):
+        if getattr(self, "state", "idle") == "compute":
+            self.busy = False      # an unfinished COMPUTE is abandoned; activity runs continue
         self.state = "idle"
         self.idx = 0
         self.bits = 0
@@ -35,8 +43,6 @@ class ChipEmulator:
         self.resp = []
         self.next_tx = 0
         self.tx = 0
-        if self.busy:
-            self.busy = False
 
     # ---- pins ----
     def write_ui(self, v):
@@ -87,6 +93,15 @@ class ChipEmulator:
                 self.state, self.busy, self.done = "compute", True, False
             elif b == 0x23:
                 self.skips = 0
+            elif b == 0x30:
+                self.state = "act"
+            elif b == 0x31:
+                self.state, self.buf = "run", []
+            elif b == 0x32:
+                if self.running:
+                    # No clock here: count one tap per 4 pin writes since RUN
+                    self._activity((self.pin_writes - self._run_start_writes) // 4)
+                    self.running, self.busy, self.done = False, False, True
             elif b in (0x20, 0x21, 0x22, 0x7F):
                 if b == 0x20:
                     v = self.acc >> self.shift
@@ -110,6 +125,19 @@ class ChipEmulator:
                 v = (self.buf[0] << 16) | (self.buf[1] << 8) | self.buf[2]
                 self.acc = v - (1 << 24) if v & 0x800000 else v
                 self.state = "idle"
+        elif s == "act":
+            self.act_thresh, self.state = b, "idle"
+        elif s == "run":
+            self.buf.append(b)
+            if len(self.buf) == 3:
+                n = (self.buf[0] << 16) | (self.buf[1] << 8) | self.buf[2]
+                self.state = "idle"
+                if n:
+                    self._activity(n)
+                    self.done, self.busy = True, False
+                else:
+                    self.running, self.busy, self.done = True, True, False
+                    self._run_start_writes = self.pin_writes
         elif s == "config":
             self.shift, self.gate, self.state = b & 0x0F, bool(b & 0x10), "idle"
         elif s == "compute":
@@ -126,3 +154,6 @@ class ChipEmulator:
                 self.next_tx = self.resp.pop(0)
             else:
                 self.state = "idle"
+
+    def _activity(self, n):
+        self.acc, self.skips = cp.activity_run(self.weights, n, self.act_thresh, self.acc, self.skips)

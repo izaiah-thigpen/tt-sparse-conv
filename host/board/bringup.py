@@ -6,6 +6,7 @@ vectors/ (model.bin, map_NN.bin) made by make_vectors.py.
 
     mpremote run bringup.py                 quick check, about a minute
     >>> import bringup; bringup.main("full")   every output of every map
+    >>> bringup.power_sweep()                  guided supply-current measurement
 
 Every check prints PASS or FAIL; the last line is the overall result. The
 same lines are appended to results.txt on the board.
@@ -14,6 +15,8 @@ Stages:
   1. Smoke tests: chip ID, accumulator read/write, hand-checked values,
      gating on/off by config and by the BYPASS pin, a 16-channel worst-case
      sum, pseudo-random values, and the DONE/BUSY pins. No files needed.
+     Also activity-mode runs (the multiplier driven every clock from the
+     chip's own generator), checked against the model, and RUN until STOP.
   2. Network tests: for each stored wafer map, layer 1 and layer 2 of the
      trained network on the chip, compared output by output with values from
      the reference model, plus skip counts. In "full" mode the chip's own
@@ -24,6 +27,11 @@ import time
 
 import chip_protocol as cp
 from tt_spi import Spi, DONE, BUSY
+
+# Weights for activity runs: all nonzero, so the share of skipped taps is the
+# generator's zero share, about threshold/256
+SWEEP_WEIGHTS = [37, -88, 101, -15, 64, 127, -127, 9, -50]
+SWEEP_THRESHOLDS = [0, 64, 128, 192, 230]
 
 PROJECT = "tt_um_izaiah_thigpen_sparse_conv"
 CLOCK_HZ = 10000000
@@ -186,6 +194,8 @@ def smoke_tests(spi, rep, n_random=12):
             bad.append("value %d: got %s want %s" % (i, got, want))
     rep.check("%d pseudo-random chained values" % n_random, not bad, "; ".join(bad[:MAX_DETAILS]))
 
+    activity_tests(spi, rep)
+
     spi.frame(cp.write_weights([1] * 9))
     idle = spi.pins()
     spi.frame(bytes([cp.COMPUTE, 1, 2, 3, 4]), keep_open=True)
@@ -196,6 +206,52 @@ def smoke_tests(spi, rep, n_random=12):
     rep.check("BUSY high during COMPUTE, DONE high after", bool(ok),
               "uo_out before 0x%02X, during 0x%02X, after 0x%02X" % (idle, mid, end))
     return True
+
+
+def wait_done(spi, tries=1000):
+    for _ in range(tries):
+        p = spi.pins()
+        if (p & DONE) and not (p & BUSY):
+            return True
+    return False
+
+
+def activity_value(spi, weights, bias, threshold, n_taps, gate=True):
+    """Finite activity run. Returns (finished, accumulator, skip count)."""
+    spi.frame(cp.write_weights(weights) + cp.write_config(0, gate) + cp.load_acc(bias)
+              + cp.clear_skips() + cp.set_activity(threshold) + cp.run(n_taps))
+    ok = wait_done(spi)
+    acc = cp.decode_acc(spi.frame(cp.read_acc()))
+    skips = cp.decode_skips(spi.frame(cp.read_skips()))
+    return ok, acc, skips
+
+
+def activity_tests(spi, rep):
+    rng = Rng(777)
+    bad = []
+    for threshold in (0, 64, 128, 230, 255):
+        weights = [rng.randint(-127, 127) for _ in range(9)]
+        weights[rng.randint(0, 8)] = 0
+        bias = rng.randint(-50000, 50000)
+        for label, gate, bypass in (("gated", True, False), ("config off", False, False), ("BYPASS", True, True)):
+            spi.set_bypass(bypass)
+            ok, acc, skips = activity_value(spi, weights, bias, threshold, 900, gate)
+            want = cp.activity_run(weights, 900, threshold, acc=bias)
+            if not ok or (acc, skips) != want:
+                bad.append("T=%d %s: done=%s got %s want %s" % (threshold, label, ok, (acc, skips), want))
+    spi.set_bypass(False)
+    rep.check("activity runs, 5 thresholds x 3 gating modes (900 taps each)", not bad,
+              "; ".join(bad[:MAX_DETAILS]))
+
+    spi.frame(cp.write_weights(SWEEP_WEIGHTS) + cp.write_config(0, True) + cp.load_acc(0)
+              + cp.clear_skips() + cp.set_activity(128) + cp.run(0))
+    running = spi.pins() & BUSY
+    spi.frame(cp.stop())
+    stopped = wait_done(spi)
+    a1 = cp.decode_acc(spi.frame(cp.read_acc()))
+    a2 = cp.decode_acc(spi.frame(cp.read_acc()))
+    rep.check("RUN until STOP: runs, stops, stays stopped", bool(running) and stopped and a1 == a2,
+              "busy while running %s, stopped %s, acc %d then %d" % (bool(running), stopped, a1, a2))
 
 
 # ----------------------------------------------------------------------
@@ -366,6 +422,55 @@ def connect(clock_hz=CLOCK_HZ):
     tt.reset_project(False)
     _sleep_ms(20)
     return tt, spi
+
+
+def _wait_user(prompt, hold_s):
+    if hold_s:
+        print("%s  (holding %d s)" % (prompt, hold_s))
+        _sleep_ms(int(hold_s * 1000))
+    else:
+        input(prompt + "  Press Enter when the reading is recorded. ")
+
+
+def power_sweep(hold_s=0, thresholds=None, clock_hz=CLOCK_HZ, log_path="power_sweep.csv"):
+    """Guided supply-current measurement of the zero-skip gating.
+
+    For each zero threshold, the chip runs continuously in activity mode, first
+    gated and then with BYPASS high (gating off), while you record the chip's
+    supply current. The difference between the two is the energy the gating
+    saves at that share of zero inputs. An idle reading (clock running, no
+    activity) is taken first as the baseline.
+
+    hold_s = 0: waits for Enter at each step (use from the REPL).
+    hold_s > 0: holds each step that many seconds, for a logging meter.
+    Writes the steps, with blank current columns to fill in, to log_path.
+    """
+    tt, spi = connect(clock_hz)
+    thresholds = thresholds or SWEEP_THRESHOLDS
+    rows = ["step,threshold,expected_zero_share,gating,current_mA"]
+    print("Power sweep: %.1f MHz project clock, weights %s" % (clock_hz / 1e6, SWEEP_WEIGHTS))
+    spi.frame(cp.write_weights(SWEEP_WEIGHTS) + cp.write_config(0, True) + cp.load_acc(0))
+    _wait_user("Step 0: idle, clock running, no activity. Record the supply current.", hold_s)
+    rows.append("0,,,idle,")
+    step = 1
+    for t in thresholds:
+        share = cp.zero_share(SWEEP_WEIGHTS, t)
+        for label, bypass in (("gated", False), ("ungated (BYPASS)", True)):
+            spi.set_bypass(bypass)
+            spi.frame(cp.set_activity(t) + cp.run(0))
+            _wait_user("Step %d: %s, threshold %d (about %.0f%% zero taps). Record the supply current."
+                       % (step, label, t, 100 * share), hold_s)
+            spi.frame(cp.stop())
+            rows.append("%d,%d,%.4f,%s," % (step, t, share, "gated" if not bypass else "ungated"))
+            step += 1
+    spi.set_bypass(False)
+    try:
+        with open(log_path, "w") as f:
+            f.write("\n".join(rows) + "\n")
+        print("Steps written to %s: add the currents to its last column." % log_path)
+    except OSError as e:
+        print("could not write %s: %s" % (log_path, e))
+    return rows
 
 
 def main(mode="quick", clock_hz=CLOCK_HZ):
