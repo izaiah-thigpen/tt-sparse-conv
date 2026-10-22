@@ -13,6 +13,7 @@ ifneq ($(GATES),yes)
 # RTL simulation:
 SIM_BUILD				= sim_build/rtl
 COMPILE_ARGS    += -g2012
+COMPILE_ARGS    += -DBEHAVIORAL_CLOCK_GATE
 VERILOG_SOURCES += $(addprefix $(SRC_DIR)/,$(PROJECT_SOURCES))
 
 else
