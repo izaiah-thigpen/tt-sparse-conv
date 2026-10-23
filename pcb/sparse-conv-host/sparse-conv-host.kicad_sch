@@ -1,0 +1,133 @@
+(kicad_sch
+  (version 20230121)
+  (generator eeschema)
+  (uuid "267c63f7-e5a3-5b47-b5df-0027d587081f")
+  (paper "A4")
+  (title_block
+    (title "Sparse Convolution Chip Host Board")
+    (date "2026-10-22")
+    (rev "A")
+    (company "Izaiah Thigpen")
+    (comment 1 "Top level: one block per sheet")
+  )
+  (lib_symbols)
+  (sheet
+    (at 30.48 40.64)
+    (size 50.8 20.32)
+    (fields_autoplaced)
+    (stroke (width 0.1524) (type solid))
+    (fill (color 0 0 0 0))
+    (uuid "00f37387-cdc3-505e-a3f7-66b37b4a4bd0")
+    (property "Sheetname" "USB-C input and 3.3 V supply"
+      (at 30.48 39.9284 0)
+      (effects
+        (font (size 1.27 1.27))
+        (justify left bottom)
+      )
+    )
+    (property "Sheetfile" "power.kicad_sch"
+      (at 30.48 61.5446 0)
+      (effects
+        (font (size 1.27 1.27))
+        (justify left top)
+      )
+    )
+    (instances
+      (project "sparse-conv-host"
+        (path "/267c63f7-e5a3-5b47-b5df-0027d587081f" (page "2"))
+      )
+    )
+  )
+  (sheet
+    (at 106.68 40.64)
+    (size 50.8 20.32)
+    (fields_autoplaced)
+    (stroke (width 0.1524) (type solid))
+    (fill (color 0 0 0 0))
+    (uuid "bc1cddb4-38ad-5d2c-b2de-610092adacdc")
+    (property "Sheetname" "RP2350B microcontroller"
+      (at 106.68 39.9284 0)
+      (effects
+        (font (size 1.27 1.27))
+        (justify left bottom)
+      )
+    )
+    (property "Sheetfile" "mcu.kicad_sch"
+      (at 106.68 61.5446 0)
+      (effects
+        (font (size 1.27 1.27))
+        (justify left top)
+      )
+    )
+    (instances
+      (project "sparse-conv-host"
+        (path "/267c63f7-e5a3-5b47-b5df-0027d587081f" (page "3"))
+      )
+    )
+  )
+  (sheet
+    (at 30.48 86.36)
+    (size 50.8 20.32)
+    (fields_autoplaced)
+    (stroke (width 0.1524) (type solid))
+    (fill (color 0 0 0 0))
+    (uuid "d0db065e-f732-541c-8b0c-5c5cf216a7b4")
+    (property "Sheetname" "Chip breakout sockets and I/O"
+      (at 30.48 85.6484 0)
+      (effects
+        (font (size 1.27 1.27))
+        (justify left bottom)
+      )
+    )
+    (property "Sheetfile" "breakout.kicad_sch"
+      (at 30.48 107.2646 0)
+      (effects
+        (font (size 1.27 1.27))
+        (justify left top)
+      )
+    )
+    (instances
+      (project "sparse-conv-host"
+        (path "/267c63f7-e5a3-5b47-b5df-0027d587081f" (page "4"))
+      )
+    )
+  )
+  (sheet
+    (at 106.68 86.36)
+    (size 50.8 20.32)
+    (fields_autoplaced)
+    (stroke (width 0.1524) (type solid))
+    (fill (color 0 0 0 0))
+    (uuid "d0d30096-fef3-5906-8b5f-47ef4a6899c8")
+    (property "Sheetname" "Chip core power monitor"
+      (at 106.68 85.6484 0)
+      (effects
+        (font (size 1.27 1.27))
+        (justify left bottom)
+      )
+    )
+    (property "Sheetfile" "power_monitor.kicad_sch"
+      (at 106.68 107.2646 0)
+      (effects
+        (font (size 1.27 1.27))
+        (justify left top)
+      )
+    )
+    (instances
+      (project "sparse-conv-host"
+        (path "/267c63f7-e5a3-5b47-b5df-0027d587081f" (page "5"))
+      )
+    )
+  )
+  (text "Host board for the sparsity-aware convolution chip (Tiny Tapeout, SkyWater 130 nm).\nKeeps the Tiny Tapeout demo board v3 RP2350B pin map, so its firmware and the host/ test kit run unchanged,\nand adds an INA228 power monitor on the chip core supply. Demo board design (c) 2025 Pat Deegan, Apache 2.0."
+    (at 30.48 150 0)
+    (effects
+      (font (size 1.5 1.5))
+      (justify left top)
+    )
+    (uuid "4cf54a95-7ea9-5f2d-9e8f-d3e3874b0bdf")
+  )
+  (sheet_instances
+    (path "/" (page "1"))
+  )
+)

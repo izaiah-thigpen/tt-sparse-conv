@@ -1,0 +1,4 @@
+(fp_lib_table
+  (version 7)
+  (lib (name "TinyTapeout")(type "KiCad")(uri "${KIPRJMOD}/libs/TinyTapeout.pretty")(options "")(descr "Tiny Tapeout footprints (psychogenic/tinytapeout-kicad-libs, Apache 2.0)"))
+)

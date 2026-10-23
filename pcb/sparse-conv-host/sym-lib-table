@@ -1,0 +1,4 @@
+(sym_lib_table
+  (version 7)
+  (lib (name "TinyTapeout")(type "KiCad")(uri "${KIPRJMOD}/libs/TinyTapeout.kicad_sym")(options "")(descr "RP2350B, TT breakout socket, PMOD host (Tiny Tapeout demo board, Apache 2.0)"))
+)

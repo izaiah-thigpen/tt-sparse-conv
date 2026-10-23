@@ -1,0 +1,29 @@
+{
+  "meta": {
+    "filename": "sparse-conv-host.kicad_pro",
+    "version": 1
+  },
+  "sheets": [
+    [
+      "267c63f7-e5a3-5b47-b5df-0027d587081f",
+      ""
+    ],
+    [
+      "00f37387-cdc3-505e-a3f7-66b37b4a4bd0",
+      "USB-C input and 3.3 V supply"
+    ],
+    [
+      "bc1cddb4-38ad-5d2c-b2de-610092adacdc",
+      "RP2350B microcontroller"
+    ],
+    [
+      "d0db065e-f732-541c-8b0c-5c5cf216a7b4",
+      "Chip breakout sockets and I/O"
+    ],
+    [
+      "d0d30096-fef3-5906-8b5f-47ef4a6899c8",
+      "Chip core power monitor"
+    ]
+  ],
+  "text_variables": {}
+}
