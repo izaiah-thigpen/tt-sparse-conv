@@ -1325,7 +1325,7 @@
         (justify left)
       )
     )
-    (property "Footprint" "Package_SO:VSSOP-10_3x3mm_P0.5mm"
+    (property "Footprint" "SparseConvHost:VSSOP-10_3x3mm_P0.5mm"
       (at 213.36 50.8 0)
       (effects
         (font (size 1.27 1.27))

@@ -6836,7 +6836,7 @@
         (justify left)
       )
     )
-    (property "Footprint" "Inductor_SMD:L_2016X120N"
+    (property "Footprint" "SparseConvHost:L_2016X120N"
       (at 134.62 96.52 0)
       (effects
         (font (size 1.27 1.27))

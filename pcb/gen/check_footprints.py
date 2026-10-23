@@ -12,7 +12,7 @@ import design
 import symlib as L
 
 STD_FP = '/usr/share/kicad/footprints'
-LOCAL = os.path.join(design.OUT, 'libs', 'TinyTapeout.pretty')
+LIBS = os.path.join(design.OUT, 'libs')
 DEMO_PCB = os.path.join(design.DEMO, 'tinytapeout-demo.kicad_pcb')
 
 
@@ -44,7 +44,7 @@ def demo_footprints():
 
 def lookup(fp, demo):
     lib, name = fp.split(':')
-    for path in (os.path.join(LOCAL, name + '.kicad_mod') if lib == 'TinyTapeout' else None,
+    for path in (os.path.join(LIBS, lib + '.pretty', name + '.kicad_mod') if lib in ('TinyTapeout', 'SparseConvHost') else None,
                  os.path.join(STD_FP, lib + '.pretty', name + '.kicad_mod')):
         if path and os.path.exists(path):
             return pads_from_text(open(path).read()), path

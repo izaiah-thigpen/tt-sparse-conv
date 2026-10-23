@@ -148,7 +148,7 @@ mcu.add(*[C('100n', '+3V3', **LCSC_100N) for _ in range(10)])
 mcu.add(C('4.7u', '+3V3', fp=C0603, MPN='GRM188C71C475KE21D'),          # VREG_VIN bulk
         R('33', '+3V3', 'VREG_AVDD', MPN='RCS040233R0FKED'),
         C('4.7u', 'VREG_AVDD', MPN='GRM155R61E475ME15D'),
-        Part(ref('L'), 'Device:L_Small', '3.3u', {'1': '+1V1', '2': 'VREG_LX'}, 'Inductor_SMD:L_2016X120N',
+        Part(ref('L'), 'Device:L_Small', '3.3u', {'1': '+1V1', '2': 'VREG_LX'}, 'SparseConvHost:L_2016X120N',
              {'MPN': 'AOTA-B201610S3R3-101-T'}),
         C('100n', '+1V1', **LCSC_100N), C('100n', '+1V1', **LCSC_100N),
         C('4.7u', '+1V1', MPN='GRM155R61E475ME15D'), C('4.7u', '+1V1', fp=C0603, MPN='GRM188C71C475KE21D'),
@@ -247,7 +247,7 @@ pm.add(Part(ref('J'), 'Connector_Generic:Conn_01x03', 'CORE', {'1': 'VCORE_IN', 
        Part(ref('U'), 'Sensor_Energy:INA226', 'INA228',
             {'10': 'VCORE_IN', '9': 'VCORE_OUT', '8': 'VCORE_OUT', '6': '+3V3', '7': 'GND',
              '1': 'GND', '2': 'GND', '3': 'PM_ALERT', '4': 'I2C_SDA', '5': 'I2C_SCL'},
-            'Package_SO:VSSOP-10_3x3mm_P0.5mm',
+            'SparseConvHost:VSSOP-10_3x3mm_P0.5mm',
             {'MPN': 'INA228AQDGSRQ1', 'LCSC': 'C5214669', 'Datasheet': 'https://www.ti.com/lit/ds/symlink/ina228.pdf'}),
        C('100n', '+3V3', **LCSC_100N),
        C('1u', '+3V3', fp=C0603, **LCSC_1U),
@@ -278,7 +278,9 @@ def package():
         '(options "")(descr "RP2350B, TT breakout socket, PMOD host (Tiny Tapeout demo board, Apache 2.0)"))\n)\n')
     open(os.path.join(OUT, 'fp-lib-table'), 'w').write(
         '(fp_lib_table\n  (version 7)\n  (lib (name "TinyTapeout")(type "KiCad")(uri "${KIPRJMOD}/libs/TinyTapeout.pretty")'
-        '(options "")(descr "Tiny Tapeout footprints (psychogenic/tinytapeout-kicad-libs, Apache 2.0)"))\n)\n')
+        '(options "")(descr "Tiny Tapeout footprints (psychogenic/tinytapeout-kicad-libs, Apache 2.0)"))\n'
+        '  (lib (name "SparseConvHost")(type "KiCad")(uri "${KIPRJMOD}/libs/SparseConvHost.pretty")'
+        '(options "")(descr "Footprints missing from KiCad 9 standard libraries: RP2350 inductor, INA228 VSSOP-10"))\n)\n')
     pro = {"meta": {"filename": "sparse-conv-host.kicad_pro", "version": 1},
            "sheets": [[str(prj.root_uuid), ""]] + [[str(s.uuid), s.title] for s in prj.sheets],
            "text_variables": {}}

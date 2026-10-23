@@ -1,4 +1,5 @@
 (fp_lib_table
   (version 7)
   (lib (name "TinyTapeout")(type "KiCad")(uri "${KIPRJMOD}/libs/TinyTapeout.pretty")(options "")(descr "Tiny Tapeout footprints (psychogenic/tinytapeout-kicad-libs, Apache 2.0)"))
+  (lib (name "SparseConvHost")(type "KiCad")(uri "${KIPRJMOD}/libs/SparseConvHost.pretty")(options "")(descr "Footprints missing from KiCad 9 standard libraries: RP2350 inductor, INA228 VSSOP-10"))
 )

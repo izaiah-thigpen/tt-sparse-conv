@@ -4,14 +4,14 @@ A replacement for the Tiny Tapeout demo board, built to measure the chip's power
 board v3's RP2350B pin map, so Tiny Tapeout's MicroPython firmware and the `host/` test kit run on it
 unchanged, and adds a TI INA228 power monitor on the chip's 1.8 V core supply.
 
-Status: **schematic rev A done and checked; layout not started.**
+Status: **schematic rev A done; KiCad 9 ERC has 0 errors; layout not started.**
 
 ## What is here
 
 | Path | Contents |
 | --- | --- |
 | `sparse-conv-host/` | The KiCad project: open `sparse-conv-host.kicad_pro` in KiCad 9 (it upgrades the KiCad 7 files) |
-| `sparse-conv-host/libs/` | Tiny Tapeout symbols (RP2350B, breakout socket, PMOD host) and footprints, Apache 2.0 |
+| `sparse-conv-host/libs/` | Tiny Tapeout symbols (RP2350B, breakout socket, PMOD host) and footprints (Apache 2.0); `SparseConvHost.pretty` holds the two footprints KiCad 9's libraries lack (RP2350 inductor, INA228 VSSOP-10) |
 | `sparse-conv-host-schematic.pdf` | The schematic, 5 pages |
 | `gen/design.py` | The design as data: every part, value, footprint, part number and pin-to-net assignment |
 | `gen/schgen.py`, `gen/symlib.py`, `gen/sexpr.py` | Writes the KiCad schematic from `design.py` |
@@ -53,6 +53,10 @@ Without the wires and with R14 in place, the board works exactly like a demo boa
 - All 63 used pins of the breakout socket match the Tiny Tapeout demo board, and the socket's power,
   ground, I/O and MUX pins were cross-checked against the SkyWater breakout rev 3.1 schematic.
 - Every symbol pin has a pad of the same number in its footprint.
+
+- KiCad 9 ERC: 0 errors. Remaining warnings are harmless: library-copy mismatches (the schematic embeds
+  KiCad 7 copies of standard symbols), QSPI_IOVDD typed bidirectional in the Tiny Tapeout RP2350 symbol,
+  and the breakout socket's hidden `3v3` pins merging into `+3V3`.
 
 Run `kicad-cli sch export netlist -o board.net sparse-conv-host/sparse-conv-host.kicad_sch`, then
 `python gen/check_netlist.py board.net` and `python gen/check_footprints.py`. Run KiCad 9's ERC as well
