@@ -211,7 +211,6 @@ class Project:
                 row_h = max(row_h, h)
         if y + row_h > bottom:
             raise ValueError(f"sheet {sh.file} overflows {sh.paper}: needs {y + row_h:.0f} mm of {bottom:.0f}")
-        pwr_n = 0
         for p, u, ax, ay, rot in placements:
             sym = self._sym(p)
             bx0, by0, bx1, by1 = _bbox_rot(sym, u, rot)
@@ -252,8 +251,8 @@ class Project:
                         prot = {(0, 1): 0, (0, -1): 180, (1, 0): 90, (-1, 0): 270}[(dx, dy)]
                     else:
                         prot = {(0, -1): 0, (0, 1): 180, (1, 0): 270, (-1, 0): 90}[(dx, dy)]
-                    pwr_n += 1
-                    pref = f"#PWR{sh.file[:3].upper()}{pwr_n:03d}"
+                    self.pwr_n = getattr(self, 'pwr_n', 0) + 1
+                    pref = f"#PWR{self.pwr_n:04d}"
                     items.append(['symbol', ['lib_id', Q(lib)], ['at', ex, ey, prot], ['unit', 1],
                                   ['in_bom', 'yes'], ['on_board', 'yes'], ['dnp', 'no'],
                                   ['uuid', uid(self.name, sh.file, pref)],
