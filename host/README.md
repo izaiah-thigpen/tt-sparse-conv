@@ -11,10 +11,11 @@ commands, sends them, and checks every reply against values precomputed by the r
 | `chip_protocol.py` | PC and board | The data-to-SPI and SPI-to-data converter: one encoder per command, decoders for replies, and readers for the vector files |
 | `board/tt_spi.py` | Board | Bit-banged SPI through the demo board's pins |
 | `board/bringup.py` | Board | The test program: smoke tests, then the trained network on stored wafer maps, with PASS/FAIL per check |
+| `board/ina228.py` | Board | Driver for the INA228 power monitor on the host board (`pcb/`); unused on a demo board |
 | `vectors/` | Board | `model.bin` (quantized weights) and `map_NN.bin` (wafer maps with expected outputs) |
 | `make_vectors.py` | PC | Writes `vectors/` from a trained model |
 | `spi_convert.py` | PC | Prints the exact SPI bytes for any single output, for use with any SPI adapter or logic analyzer |
-| `tests/` | PC | A software model of the chip, to run the board program without hardware |
+| `tests/` | PC | A software model of the chip and of the INA228, to run the board program and the power sweep without hardware |
 | `../power/` | PC | Gate-level power simulation of the same sweep, the prediction for the measurement |
 
 ## Testing a chip
@@ -26,7 +27,7 @@ An oscilloscope is optional.
 2. Plug in the demo board. From this repository's root, copy the program and vectors:
 
    ```
-   mpremote fs cp host/chip_protocol.py host/board/tt_spi.py host/board/bringup.py :
+   mpremote fs cp host/chip_protocol.py host/board/tt_spi.py host/board/bringup.py host/board/ina228.py :
    mpremote fs cp -r host/vectors :
    ```
 
@@ -60,16 +61,23 @@ current barely changes with the data. The activity mode (`SET_ACTIVITY`, `RUN`, 
 the multiplier every clock on generated pixels, a chosen share of them zero, so the gating's saving
 shows up in the supply current.
 
+**On the host board (`pcb/`)** the measurement is automatic. Route the core supply through the board's
+shunt (see `pcb/README.md`), then run:
+
+```
+mpremote exec "import bringup; bringup.power_sweep()"
+```
+
+Each step holds 5 seconds while the INA228 records mean current, its spread, core voltage, and power from its
+energy accumulator. The sweep runs the chip at 50 MHz, its sign-off clock, prints a table of gated vs ungated
+power and the saving at each share of zeros, and writes everything to `power_sweep.csv`.
+
+**On a demo board** with an external meter:
+
 1. Put a current meter (or a sense resistor and a scope) on the chip's supply. Keep the clock fixed.
-2. Run the guided sweep, pressing Enter after recording each reading:
-
-   ```
-   mpremote exec "import bringup; bringup.power_sweep()"
-   ```
-
-   It steps through idle, then zero shares of 0, 25, 50, 75 and 90%, each gated and with BYPASS high.
-   For a logging meter, `bringup.power_sweep(hold_s=10)` holds each step 10 seconds instead.
-3. `mpremote fs cp :power_sweep.csv .` retrieves the step list; add the currents to its last column.
+2. Run the same command, pressing Enter after recording each reading. For a logging meter,
+   `bringup.power_sweep(hold_s=10)` holds each step 10 seconds instead.
+3. `mpremote fs cp :power_sweep.csv .` retrieves the step list; add the currents to its columns.
 
 The quick test already checks that activity runs give exactly the model's accumulator and skip count, so a
 passing quick test means the generator and gating work before any current is measured. The simulated
@@ -112,4 +120,7 @@ python host/make_vectors.py --demo demo_data.npz --out host/vectors --per-class 
   post-layout gate-level netlist.
 - `tests/run_emulated.py` runs the same program on MicroPython against `tests/chip_emulator.py`, a
   software model of the chip, to confirm the board files are MicroPython-compatible.
+- `tests/test_power_sweep.py` runs the power sweep against the chip model and a register-level model of the
+  INA228 whose current follows the chip's state, on CPython and MicroPython; it must recover each modeled
+  gated-vs-ungated difference to 0.1 µA.
 - In simulation the data stays correct down to 2 chip clocks per pin access; the board gives far more.

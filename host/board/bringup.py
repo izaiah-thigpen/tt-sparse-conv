@@ -1,12 +1,13 @@
 """Bring-up and verification of the sparsity-aware convolution chip.
 
-Runs on the Tiny Tapeout demo board (MicroPython on the RP2040). Needs these
-files on the board: chip_protocol.py, tt_spi.py, bringup.py, and the folder
-vectors/ (model.bin, map_NN.bin) made by make_vectors.py.
+Runs on the Tiny Tapeout demo board or the host board in pcb/ (MicroPython).
+Needs these files on the board: chip_protocol.py, tt_spi.py, bringup.py,
+ina228.py (host board power monitor), and the folder vectors/ (model.bin,
+map_NN.bin) made by make_vectors.py.
 
     mpremote run bringup.py                 quick check, about a minute
     >>> import bringup; bringup.main("full")   every output of every map
-    >>> bringup.power_sweep()                  guided supply-current measurement
+    >>> bringup.power_sweep()                  power measurement (automatic on the host board)
 
 Every check prints PASS or FAIL; the last line is the overall result. The
 same lines are appended to results.txt on the board.
@@ -432,42 +433,93 @@ def _wait_user(prompt, hold_s):
         input(prompt + "  Press Enter when the reading is recorded. ")
 
 
-def power_sweep(hold_s=0, thresholds=None, clock_hz=CLOCK_HZ, log_path="power_sweep.csv"):
-    """Guided supply-current measurement of the zero-skip gating.
+SWEEP_CLOCK_HZ = 50000000   # the chip's sign-off clock; the gating's saving scales with it
+
+
+def _measure(ina, hold_s, settle_s=0.5):
+    """Mean current (A), its spread, core voltage (V) and power from the energy
+    accumulator (W) over hold_s seconds."""
+    _sleep_ms(int(settle_s * 1000))
+    ina.reset_accumulators()
+    t0 = _ms()
+    n, s1, s2, v = 0, 0.0, 0.0, 0.0
+    while _elapsed_s(t0) < hold_s:
+        _sleep_ms(max(1, int(ina.conversion_s * 1000)))
+        i = ina.current()
+        n += 1; s1 += i; s2 += i * i
+        v += ina.bus_voltage()
+    secs = _elapsed_s(t0)
+    mean = s1 / n
+    spread = max(0.0, s2 / n - mean * mean) ** 0.5
+    return mean, spread, v / n, ina.energy() / secs if secs > 0 else 0.0
+
+
+def power_sweep(hold_s=None, thresholds=None, clock_hz=SWEEP_CLOCK_HZ, log_path="power_sweep.csv",
+                spi=None, ina="auto"):
+    """Supply-current measurement of the zero-skip gating.
 
     For each zero threshold, the chip runs continuously in activity mode, first
-    gated and then with BYPASS high (gating off), while you record the chip's
-    supply current. The difference between the two is the energy the gating
-    saves at that share of zero inputs. An idle reading (clock running, no
-    activity) is taken first as the baseline.
+    gated and then with BYPASS high (gating off). The difference between the
+    two is the power the gating saves at that share of zero inputs. An idle
+    step (clock running, no activity) comes first as the baseline.
 
-    hold_s = 0: waits for Enter at each step (use from the REPL).
-    hold_s > 0: holds each step that many seconds, for a logging meter.
-    Writes the steps, with blank current columns to fill in, to log_path.
+    On the host board (pcb/), the INA228 on the core supply is read
+    automatically: each step records mean current, its spread, core voltage
+    and power from the INA228's energy accumulator. hold_s defaults to 5 s.
+
+    On a demo board, with an external meter: hold_s = 0 (the default there)
+    waits for Enter at each step; hold_s > 0 holds each step that long for a
+    logging meter. The CSV then has blank columns to fill in.
     """
-    tt, spi = connect(clock_hz)
+    if spi is None:
+        tt, spi = connect(clock_hz)
+    if ina == "auto":
+        import ina228
+        ina = ina228.open_host_board()
+    if hold_s is None:
+        hold_s = 5 if ina else 0
     thresholds = thresholds or SWEEP_THRESHOLDS
-    rows = ["step,threshold,expected_zero_share,gating,current_mA"]
-    print("Power sweep: %.1f MHz project clock, weights %s" % (clock_hz / 1e6, SWEEP_WEIGHTS))
+    rows = ["step,threshold,expected_zero_share,gating,current_mA,current_spread_uA,vcore_V,energy_power_uW"]
+    results = {}
+    print("Power sweep: %.1f MHz project clock, weights %s, %s" % (
+        clock_hz / 1e6, SWEEP_WEIGHTS, "INA228 on the core supply" if ina else "external meter"))
+
+    def record(step, t, share, label, prompt):
+        if ina:
+            print(prompt)
+            i, sd, v, p = _measure(ina, hold_s)
+            print("    %.4f mA (spread %.2f uA), %.4f V, %.1f uW (energy register %.1f uW)"
+                  % (i * 1e3, sd * 1e6, v, i * v * 1e6, p * 1e6))
+            results[(t, label)] = i * v       # finer than the energy register over a few seconds
+            rows.append("%d,%s,%s,%s,%.6f,%.3f,%.5f,%.3f" % (step, t, share, label, i * 1e3, sd * 1e6, v, p * 1e6))
+        else:
+            _wait_user(prompt + " Record the supply current.", hold_s)
+            rows.append("%d,%s,%s,%s,,,," % (step, t, share, label))
+
     spi.frame(cp.write_weights(SWEEP_WEIGHTS) + cp.write_config(0, True) + cp.load_acc(0))
-    _wait_user("Step 0: idle, clock running, no activity. Record the supply current.", hold_s)
-    rows.append("0,,,idle,")
+    record(0, "", "", "idle", "Step 0: idle, clock running, no activity.")
     step = 1
     for t in thresholds:
         share = cp.zero_share(SWEEP_WEIGHTS, t)
-        for label, bypass in (("gated", False), ("ungated (BYPASS)", True)):
+        for label, bypass in (("gated", False), ("ungated", True)):
             spi.set_bypass(bypass)
             spi.frame(cp.set_activity(t) + cp.run(0))
-            _wait_user("Step %d: %s, threshold %d (about %.0f%% zero taps). Record the supply current."
-                       % (step, label, t, 100 * share), hold_s)
+            record(step, t, "%.4f" % share, label, "Step %d: %s, threshold %d (about %.0f%% zero taps)."
+                   % (step, "gated" if not bypass else "ungated (BYPASS)", t, 100 * share))
             spi.frame(cp.stop())
-            rows.append("%d,%d,%.4f,%s," % (step, t, share, "gated" if not bypass else "ungated"))
             step += 1
     spi.set_bypass(False)
+    if results:
+        print("Zeros   gated uW  ungated uW  saved uW  saved")
+        for t in thresholds:
+            g, u = results[(t, "gated")], results[(t, "ungated")]
+            print("%4.0f%%  %9.1f  %10.1f  %8.1f  %5.1f%%" % (
+                100 * cp.zero_share(SWEEP_WEIGHTS, t), g * 1e6, u * 1e6, (u - g) * 1e6,
+                100 * (u - g) / u if u else 0))
     try:
         with open(log_path, "w") as f:
             f.write("\n".join(rows) + "\n")
-        print("Steps written to %s: add the currents to its last column." % log_path)
+        print("Steps written to %s%s." % (log_path, "" if ina else ": add the currents to its columns"))
     except OSError as e:
         print("could not write %s: %s" % (log_path, e))
     return rows
