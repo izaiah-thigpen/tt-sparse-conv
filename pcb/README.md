@@ -4,7 +4,7 @@ A replacement for the Tiny Tapeout demo board, built to measure the chip's power
 board v3's RP2350B pin map, so Tiny Tapeout's MicroPython firmware and the `host/` test kit run on it
 unchanged, and adds a TI INA228 power monitor on the chip's 1.8 V core supply.
 
-Status: **schematic rev A done; KiCad 9 ERC has 0 errors; layout not started.**
+Status: **schematic rev A done; KiCad 9 ERC has 0 errors; starting placement done (`placement/`); routing not started.**
 
 ## What is here
 
@@ -16,6 +16,8 @@ Status: **schematic rev A done; KiCad 9 ERC has 0 errors; layout not started.**
 | `gen/design.py` | The design as data: every part, value, footprint, part number and pin-to-net assignment |
 | `gen/schgen.py`, `gen/symlib.py`, `gen/sexpr.py` | Writes the KiCad schematic from `design.py` |
 | `gen/check_netlist.py`, `gen/check_footprints.py` | Checks KiCad's own exported netlist against the design |
+| `placement/` | Starting placement: `sparse-conv-host-placed.kicad_pcb` (all 110 parts placed, 4 layers, design rules set), `placement.csv` (every part's X, Y and rotation) and `placement-preview.png` |
+| `gen/placement/` | The script that makes them, from the demo board's arrangement (see its README) |
 
 The schematic is generated, so change `design.py` and rerun `python gen/design.py` rather than editing
 connections by hand. Moving symbols around in KiCad for readability is fine; it does not change the nets.
@@ -67,8 +69,16 @@ after opening the project.
 - Confirm this shuttle's chips ship on SkyWater breakout rev 3.1.
 - JLCPCB sourcing for the Hirose DF12NB(5.0)-60DP and -50DP connectors, the RP2350B, the shunts and
   the 10 MΩ resistors (LCSC numbers are filled in only where verified).
+- Board outline 100 × 85 mm, corner at (100, 100). The RP2350B sits under the breakout board, as on the demo board.
 - Layout: 4 layers; Kelvin traces from the shunt pads to the INA228; follow Raspberry Pi's RP2350
   layout guidance for the crystal, flash and core regulator.
+
+## KiCad 10 note
+
+KiCad 10's `USB_C_Receptacle_HRO_TYPE-C-31-M-12` footprint names the shell pads `SH`; KiCad 7's
+symbol calls the shield pin `S1`. In the project, J1's shield pin number was changed to `SH` in the
+Symbol Editor so the shell connects to `USB_SHIELD`. If the schematic is ever regenerated from
+`design.py`, make the same change again before updating the PCB.
 
 Derived from the [Tiny Tapeout demo board](https://github.com/TinyTapeout/tt-demo-pcb) and
 [breakout](https://github.com/TinyTapeout/breakout-pcb) designs, © 2024–2025 Pat Deegan / Psychogenic

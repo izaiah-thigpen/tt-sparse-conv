@@ -1,0 +1,245 @@
+(footprint "L_2016X120N"
+  (version 20221018)
+  (generator "pcbnew")
+  
+  (layer "F.Cu")
+  (descr "0806 2016 inductor package")
+  (tags "0806 2016")
+  (property "Reference" "L1"
+    (at 1.1 -1.8 0)
+    (layer "F.SilkS")
+    (hide yes)
+    
+    (effects
+      (font (size 1 1) (thickness 0.15))
+    )
+  )
+  (property "Value" "3.3u"
+    (at 1.54 1.5 0)
+    (layer "F.Fab")
+    (hide yes)
+    
+    (effects
+      (font (size 1 1) (thickness 0.15))
+    )
+  )
+  (property "Datasheet" "https://abracon.com/datasheets/AOTA-B201610S3R3-101-T.pdf"
+    (at 0 0 0)
+    (layer "F.Fab")
+    (hide yes)
+    
+    (effects
+      (font (size 1.27 1.27) (thickness 0.15))
+    )
+  )
+  (property "Description" "Inductor, small symbol"
+    (at 0 0 0)
+    (layer "F.Fab")
+    (hide yes)
+    
+    (effects
+      (font (size 1.27 1.27) (thickness 0.15))
+    )
+  )
+  (property "Characteristics" "0806 Power Inductors"
+    (at 0 0 0)
+    (unlocked yes)
+    (layer "F.Fab")
+    (hide yes)
+    
+    (effects
+      (font (size 1 1) (thickness 0.15))
+    )
+  )
+  (property "Variant" ""
+    (at 0 0 0)
+    (unlocked yes)
+    (layer "F.Fab")
+    (hide yes)
+    
+    (effects
+      (font (size 1 1) (thickness 0.15))
+    )
+  )
+  (property "MPN" "AOTA-B201610S3R3-101-T"
+    (at 0 0 0)
+    (unlocked yes)
+    (layer "F.Fab")
+    (hide yes)
+    
+    (effects
+      (font (size 1 1) (thickness 0.15))
+    )
+  )
+  (property "MPN_ALT" ""
+    (at 0 0 0)
+    (unlocked yes)
+    (layer "F.Fab")
+    (hide yes)
+    
+    (effects
+      (font (size 1 1) (thickness 0.15))
+    )
+  )
+  (property "DigikeyPN" "535-AOTA-B201610S3R3-101-TCT-ND"
+    (at 0 0 0)
+    (unlocked yes)
+    (layer "F.Fab")
+    (hide yes)
+    
+    (effects
+      (font (size 1 1) (thickness 0.15))
+    )
+  )
+  (property "LCSC" ""
+    (at 0 0 0)
+    (unlocked yes)
+    (layer "F.Fab")
+    (hide yes)
+    
+    (effects
+      (font (size 1 1) (thickness 0.15))
+    )
+  )
+  (property "JLC" "C42411119"
+    (at 0 0 0)
+    (unlocked yes)
+    (layer "F.Fab")
+    (hide yes)
+    
+    (effects
+      (font (size 1 1) (thickness 0.15))
+    )
+  )
+  (property "DNC" ""
+    (at 0 0 0)
+    (unlocked yes)
+    (layer "F.Fab")
+    (hide yes)
+    
+    (effects
+      (font (size 1 1) (thickness 0.15))
+    )
+  )
+  (property ki_fp_filters "Choke_* *Coil* Inductor_* L_*")
+  (attr smd)
+  (fp_line
+    (start -1.7 -1.2)
+    (end -1.7 1.2)
+    (stroke (width 0.12) (type solid))
+    (layer "F.SilkS")
+    
+  )
+  (fp_line
+    (start -1.7 1.2)
+    (end 1.7 1.2)
+    (stroke (width 0.12) (type solid))
+    (layer "F.SilkS")
+    
+  )
+  (fp_line
+    (start 1.7 -1.2)
+    (end -1.7 -1.2)
+    (stroke (width 0.12) (type solid))
+    (layer "F.SilkS")
+    
+  )
+  (fp_line
+    (start 1.7 1.2)
+    (end 1.7 -1.2)
+    (stroke (width 0.12) (type solid))
+    (layer "F.SilkS")
+    
+  )
+  (fp_line
+    (start -1.708 -1.158)
+    (end 1.708 -1.158)
+    (stroke (width 0.05) (type solid))
+    (layer "F.CrtYd")
+    
+  )
+  (fp_line
+    (start -1.708 1.158)
+    (end -1.708 -1.158)
+    (stroke (width 0.05) (type solid))
+    (layer "F.CrtYd")
+    
+  )
+  (fp_line
+    (start -1.708 1.158)
+    (end 1.708 1.158)
+    (stroke (width 0.05) (type solid))
+    (layer "F.CrtYd")
+    
+  )
+  (fp_line
+    (start 1.708 1.158)
+    (end 1.708 -1.158)
+    (stroke (width 0.05) (type solid))
+    (layer "F.CrtYd")
+    
+  )
+  (fp_line
+    (start -1.1 0.9)
+    (end -1.1 -0.9)
+    (stroke (width 0.127) (type solid))
+    (layer "F.Fab")
+    
+  )
+  (fp_line
+    (start 1.1 -0.9)
+    (end -1.1 -0.9)
+    (stroke (width 0.127) (type solid))
+    (layer "F.Fab")
+    
+  )
+  (fp_line
+    (start 1.1 0.9)
+    (end -1.1 0.9)
+    (stroke (width 0.127) (type solid))
+    (layer "F.Fab")
+    
+  )
+  (fp_line
+    (start 1.1 0.9)
+    (end 1.1 -0.9)
+    (stroke (width 0.127) (type solid))
+    (layer "F.Fab")
+    
+  )
+  (fp_text user "${REFERENCE}"
+    (at -0.5 0.4 0)
+    (unlocked yes)
+    (layer "F.Fab")
+    
+    (effects
+      (font (size 0.6 0.6) (thickness 0.15))
+      (justify left bottom)
+    )
+  )
+  (pad "1" smd rect
+    (at -0.91 0)
+    (size 1.2 1.82)
+    (layers "F.Cu" "F.Mask" "F.Paste")
+    (net 10 "+1V1")
+    (pintype "passive")
+    
+  )
+  (pad "2" smd rect
+    (at 0.91 0)
+    (size 1.2 1.82)
+    (layers "F.Cu" "F.Mask" "F.Paste")
+    (net 48 "/RP2350/VREG_LX")
+    (pintype "passive")
+    
+  )
+  
+  (embedded_files
+    (file (name "L_2016X120N.step") (type model) (checksum "C5791CC2B310C476D59BAD1AFCE758A0"))
+  )
+  (model "kicad-embed://L_2016X120N.step"
+    (offset (xyz 0 -0.75 0))
+    (scale (xyz 1.2 1.2 1.2))
+    (rotate (xyz 0 0 0))
+  )
+)
