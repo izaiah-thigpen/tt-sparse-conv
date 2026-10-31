@@ -8,6 +8,9 @@ zero, and counts how many it skipped. It is the silicon half of a wafer-map defe
 classifier: on the trained network, 77% of taps have a zero operand.
 
 - [Datasheet: how it works and how to test](docs/info.md)
+- [From a wafer to a defect class](docs/wafer_to_class.md): the dataset, how a wafer becomes the network's input, and what each layer does, with pictures
+
+![One wafer map through the network](docs/figures/layers.png)
 
 ## Layout
 

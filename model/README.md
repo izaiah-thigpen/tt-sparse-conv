@@ -16,6 +16,8 @@ and stores no weights: the host sends them with every computation (see `host/REA
 | Accuracy | test macro F1 0.819 (floating point), 0.820 (8-bit integer, as the chip computes) |
 | Sparsity | 77% of the chip's multiplies have a zero operand |
 
+For a picture-by-picture walk through the data and the layers, see [docs/wafer_to_class.md](../docs/wafer_to_class.md).
+
 `net.py` defines the network. `test/refmodel.py` is the bit-exact integer model of the chip; the quantizer, the
 chip tests and the board's test vectors all use it, so the model that sets accuracy is the model that checks
 the hardware.
