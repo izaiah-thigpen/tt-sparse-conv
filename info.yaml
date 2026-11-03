@@ -1,6 +1,6 @@
 # Tiny Tapeout project information
 project:
-  title:        "Sparsity-Aware Convolution Core"      # Project title
+  title:        "SJSU Sparsity-Aware Convolution Core"      # Project title
   author:       "Izaiah Thigpen"      # Your name
   discord:      ""      # Your discord username, for communication and automatically assigning you a Tapeout role (optional)
   description:  "8-bit 3x3 convolution multiply-accumulate core over SPI that skips work on zero operands"      # One line description of what your project does

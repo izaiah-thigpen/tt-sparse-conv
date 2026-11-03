@@ -1,6 +1,6 @@
 ![](../../workflows/gds/badge.svg) ![](../../workflows/docs/badge.svg) ![](../../workflows/test/badge.svg) ![](../../workflows/fpga/badge.svg)
 
-# Sparsity-Aware Convolution Core
+# SJSU Sparsity-Aware Convolution Core
 
 An 8-bit 3×3 convolution multiply-accumulate core for Tiny Tapeout (SkyWater 130 nm),
 controlled over SPI. It skips the switching work of any tap whose pixel or weight is
