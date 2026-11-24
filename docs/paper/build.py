@@ -50,7 +50,10 @@ class Doc:
         self.parts.append(xml)
 
     def title(self, t):
-        self.add(p('Title', t))
+        """Title lines separated by '|' become manual line breaks, so the wrap is chosen, not left to chance."""
+        parts = t.split('|')
+        body = '<w:r><w:br/></w:r>'.join(runs(s) for s in parts)
+        self.add('<w:p><w:pPr><w:pStyle w:val="Title"/></w:pPr>%s</w:p>' % body)
 
     def author_break(self):
         # the template's author paragraph carries the one-column title section; names left out for blind review

@@ -3,7 +3,7 @@ Every number comes from the tt-sparse-conv repository (power/results/power.csv, 
 reports, the FPGA run and the model metrics)."""
 F = '/home/claude/figs/'
 
-TITLE = 'A Zero-Skipping Convolution Core for Wafer-Map Defect Classification in Open-Source 130 nm CMOS'
+TITLE = 'A Zero-Skipping Convolution Core for|Wafer‑Map Defect Classification in|Open‑Source 130 nm CMOS'
 KEYWORDS = 'wafer map, defect classification, CNN accelerator, sparsity, operand isolation, low-power design, open-source silicon'
 
 REFS = [
@@ -56,6 +56,9 @@ def abstract(d):
     d.body('Table I and Fig. 2 summarize the results. The gating reduces the MAC’s dynamic power (its power above idle) by 10.2% at 25% zeros, rising to 66.3% at 90%. At the chip level the saving is only 2.1% to 7.7%. The reason is the clock: running with no computation, the chip draws 709 µW of the 1,071 µW it draws at full activity, almost all of it clock power in its 344 flip-flops, which operand isolation leaves untouched. Zero-skipping removes most of the arithmetic’s switching, but at this scale the clock network sets the total, and gating the MAC registers’ clock on zero taps is the natural next step. On the FPGA, all 180 test wafer maps matched the integer reference model bit for bit.')
     d.table('Simulated Power, Typical Corner, 50 MHz', POWER_HDR_SHORT, POWER_ROWS_SHORT, [42, 48, 52, 52, 49])
     d.figure(F + 'fig2_power.png', FIG2)
+    d.body('Fig. 3 shows why. It splits the chip’s power into a fixed clock floor, the extra flip-flop power caused by changing data, and the combinational logic. Zero-skipping shrinks the two upper parts, the combinational logic most, but the 709 µW floor does not move, so the chip-level saving stays small however sparse the data. Per clock cycle, the MAC’s dynamic energy falls from 4.7 pJ per tap with no zeros to 0.73 pJ at 90% zeros, while the chip still spends 14.2 pJ per cycle on the clock floor.')
+    d.figure(F + 'fig4_breakdown.png', 'Simulated chip power by component for BYPASS (B) and gated (G) operation at each share of zero pixels. The clock floor, drawn by the flip-flops with the clock running and no computation, does not change.')
+    d.body('Clock gating is the natural next step. The MAC accounts for 119.6 µW of the idle floor; if gating also stopped the clock to the MAC’s registers on every zero tap, and that share fell in proportion to the zero share, the chip-level saving would rise to at most about 10% at 50% zeros and 19% at 90%. The rest of the floor belongs mostly to the SPI interface and control logic, which a larger MAC array would share.')
     d.body('The fabricated chips are expected in mid-2027. A host board with a current monitor on the 1.8 V core supply will measure the activity-mode sweep on silicon to test these predictions.')
 
     d.h5('Acknowledgment')
@@ -151,9 +154,16 @@ def full(d):
     d.figure(F + 'fig4_breakdown.png', 'Simulated chip power by component for BYPASS (B) and gated (G) operation at each share of zero pixels. The clock floor, the power drawn by the flip-flops with the clock running and no computation, does not change.')
     d.body('At the chip level the saving is only 2.1% to 7.7%. Running with the clock on and no computation, the chip draws 709 µW, two-thirds of the 1,071 µW it draws at full activity, and nearly all of that is clock power in its 344 flip-flops. Operand isolation removes data switching but leaves every register clocked, so it cannot reduce this floor. In Eyeriss, where the arithmetic dominates, gating saves 45% of processing-element power [5]; in a single-MAC chip, the same idea saves most of the MAC’s dynamic power but little of the total. Per clock cycle, the MAC’s dynamic energy falls from 4.7 pJ per tap with no zeros to 0.73 pJ per tap at 90% zeros with gating, while the whole chip still spends 17.3 pJ per cycle at 90% zeros, 14.2 pJ of it in the clock floor.')
     d.body('Two design directions follow. First, gating the clock of the MAC’s registers on zero taps would remove their clock power along with their data switching, attacking the floor directly. Second, a larger array of MACs sharing one clock tree and controller spreads the fixed overhead over more arithmetic, so the same zero-skipping recovers a larger share of the total. Wafer maps make both attractive, since their 77% zero share is well above the roughly 44% reported for natural-image networks [6].')
+    d.body('Table IV places these results beside the zero-skipping accelerators reviewed in Section II. The comparison is qualitative, since the designs differ in scale, process and workload, but it shows the trend this paper measures: the same idea that saves a large share of power in an arithmetic-dominated array saves most of a single MAC’s dynamic power yet little of a small chip’s total.')
+    d.table('Zero-Skipping Accelerators Compared', ['Design', 'Scale', 'Zeros skipped', 'Reported benefit'],
+            [['Eyeriss [5]', '168 PEs', 'activations', '45% lower PE power'],
+             ['Cnvlutin [6]', 'large array', 'activations (~44% of inputs)', '1.37× speedup'],
+             ['SCNN [7]', 'large array', 'weights and activations', '2.7× performance, 2.3× energy efficiency'],
+             ['This work', '1 MAC, 2,690 cells', 'pixels or weights (77%)', '23–66% MAC dynamic power; ≤7.7% chip']],
+            [46, 52, 66, 79])
     d.body('The simulation also bounds what clock gating could add. The MAC accounts for 119.6 \u00b5W of the idle floor. If gating also stopped the clock to the MAC\u2019s registers on every zero tap, and that share of the floor fell in proportion to the zero share, the chip-level saving would rise to at most about 10% at 50% zeros and 19% at 90%. The remaining floor belongs mostly to the SPI interface, the configuration registers and the activity-mode generator, which a larger array would share across many MACs.')
     d.h2('Functional Results')
-    d.body('Table IV summarizes the FPGA run. All 180 test wafer maps produced the same integer outputs as the reference model, with 68.1% of the multiply-accumulates skipped on that set. Quantization did not change accuracy: the integer network’s macro F1 score of 0.820 matches the floating-point model’s 0.819.')
+    d.body('Table V summarizes the FPGA run. All 180 test wafer maps produced the same integer outputs as the reference model, with 68.1% of the multiply-accumulates skipped on that set. Quantization did not change accuracy: the integer network’s macro F1 score of 0.820 matches the floating-point model’s 0.819.')
     d.table('FPGA Validation on a Zynq-7020 (PYNQ-Z1)', ['Item', 'Result'],
             [['Parallel MACs', '9 (one 3 \u00d7 3 window per clock)'],
              ['Clock', '100 MHz, worst slack +1.81 ns'],
@@ -165,6 +175,9 @@ def full(d):
 
     d.h2('Limitations')
     d.body('The power figures come from simulation at one process corner, with one weight set and with pseudo-random pixels at a controlled zero share rather than real wafer maps; real layers also contain zero weights, which the gating skips as well. They cover the core logic only, not the I/O pads or the SPI transfers. Throughput was not a design goal: one MAC at 50 MHz needs at least 10.4 ms of compute for the 518,976 convolution taps of one wafer, and in practice the SPI link, which carries every weight and pixel, sets the rate. The FPGA version, with nine MACs at 100 MHz and DMA, shows how the same datapath scales when bandwidth is available.')
+
+    d.h2('Future Work')
+    d.body('Three extensions follow directly. The first adds clock gating to the MAC’s registers, driven by the same zero detection, and measures how much of the 119.6 µW MAC floor it recovers. The second replaces the pseudo-random activity mode with real wafer-map layers in the power simulation, including zero weights, to check that the controlled sweep predicts real workloads. The third scales the core to an array of MACs sharing one controller, as in the FPGA version, and measures how the chip-level saving grows as the fixed overhead is spread across more arithmetic.')
 
     d.h1('Silicon Measurement Plan')
     d.body('The fabricated chips are expected in mid-2027. The standard Tiny Tapeout demonstration board can run the chip but cannot measure its core current, so a dedicated four-layer host board was designed for the measurement (Fig. 8). It keeps the demonstration board\u2019s RP2350B microcontroller and pin assignment, so the existing test software runs unchanged, and adds a TI INA228 power monitor on the chip\u2019s 1.8 V core supply.')
