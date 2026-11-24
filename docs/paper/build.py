@@ -131,7 +131,7 @@ AUTHOR = re.search(r'<w:p [^>]*>(?:(?!</w:p>).)*?<w:pStyle w:val="Author"/>.*?</
 TAIL = re.search(r'<w:sectPr [^>]*>(?:(?!<w:sectPr).)*?</w:sectPr>\s*</w:body>\s*</w:document>\s*$', SRC, re.S).group(0)
 
 
-def write(doc, out):
+def write(doc, out, balance=True):
     work = out + '.d'
     if os.path.exists(work):
         shutil.rmtree(work)
@@ -148,7 +148,13 @@ def write(doc, out):
         new += '<Relationship Id="rIdFig%d" Type="http://purl.oclc.org/ooxml/officeDocument/relationships/image" Target="media/fig%d.png"/>' % (i, i)
     rels = rels.replace('</Relationships>', new + '</Relationships>')
     open(rels_path, 'w', encoding='utf8').write(rels)
-    open(os.path.join(work, 'word', 'document.xml'), 'w', encoding='utf8').write(HEAD + ''.join(doc.parts) + TAIL)
+    # Balance the two columns on the last page (IEEE style): end the two-column section with a
+    # continuous section break, then close the document with an empty one-column section.
+    sect = re.search(r'<w:sectPr [^>]*>.*?</w:sectPr>', TAIL, re.S).group(0)
+    closing = '' if not balance else '<w:p><w:pPr><w:spacing w:before="0pt" w:after="0pt" w:line="12pt" w:lineRule="exact"/>%s</w:pPr></w:p>' % sect
+    last = re.sub(r'<w:cols [^>]*/>', '<w:cols w:space="18pt"/>', sect)
+    tail = TAIL.replace(sect, last, 1) if balance else TAIL
+    open(os.path.join(work, 'word', 'document.xml'), 'w', encoding='utf8').write(HEAD + ''.join(doc.parts) + closing + tail)
     if os.path.exists(out):
         os.remove(out)
     with zipfile.ZipFile(out, 'w', zipfile.ZIP_DEFLATED) as z:
@@ -164,5 +170,5 @@ if __name__ == '__main__':
     which, out = sys.argv[1], sys.argv[2]
     d = Doc()
     getattr(content, which)(d)
-    write(d, out)
+    write(d, out, balance=(which == 'full'))
     print('wrote', out)
