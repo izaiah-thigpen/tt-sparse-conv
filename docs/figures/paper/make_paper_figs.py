@@ -120,15 +120,21 @@ if __name__ == '__main__':
     print(fig_power(sys.argv[1], out + '/fig2_power'))
 
 
-def fig_input(pkl, path):
-    """Fig. 3 (full paper): die-level map and the 32 x 32 network input, one column wide."""
-    import numpy as np, pandas as pd
+def _real(npz):
+    """Real WM-811K test wafers from model/export_real_wafers.py, plus the rows behind the nine test vectors."""
+    import numpy as np
+    d = np.load(npz, allow_pickle=True)
+    rows = [int(np.where(d['row'] == r)[0][0]) for r in d['vector_rows']]
+    return d, rows
+
+
+def fig_input(npz, path, k=1):
+    """Full paper: one real wafer (test vector k, a Donut) as die results and as the 32 x 32 network input."""
+    import numpy as np
     from matplotlib.colors import ListedColormap
-    sys.path.insert(0, '/home/claude/tt-sparse-conv/docs/figures')
-    from make_figures import density, label_of
-    df = pd.read_pickle(pkl)
-    m = np.asarray([w for w, f in zip(df.waferMap, df.failureType) if label_of(f) == 'Donut'][0])
-    x = density(m)
+    d, rows = _real(npz)
+    i = rows[k]
+    m = np.asarray(d['wafer_maps'][i]); x = d['density'][i]
     fig, axs = plt.subplots(1, 2, figsize=(3.5, 1.95), gridspec_kw={'wspace': 0.12})
     axs[0].imshow(m, cmap=ListedColormap(['#ffffff', '#c9c8c3', '#0b0b0b']), vmin=0, vmax=2, interpolation='nearest')
     axs[1].imshow(x, cmap='gray_r', vmin=0, vmax=255, interpolation='nearest')
@@ -144,7 +150,8 @@ def fig_input(pkl, path):
     fig.savefig(path + '.png', dpi=600, bbox_inches='tight', facecolor='white')
     fig.savefig(path + '.pdf', bbox_inches='tight', facecolor='white')
     plt.close(fig)
-    return m.shape, int((m > 0).sum()), float((x == 0).mean())
+    return dict(label=str(d['labels'][i]), lot=str(d['lots'][i]), wafer=int(d['wafer_index'][i]), shape=m.shape,
+                dies=int((m > 0).sum()), fails=int((m == 2).sum()), zero=float((x == 0).mean()))
 
 
 def fig_breakdown(csv_path, path):
@@ -185,31 +192,34 @@ def fig_breakdown(csv_path, path):
     plt.close(fig)
 
 
-def fig_classes(npz, vectors_dir, path):
-    """Full paper: the nine classes (real WM-811K test maps), 3 x 3, with the integer model's answer."""
-    import numpy as np, os
+def fig_classes(qnpz, real_npz, path):
+    """Full paper: the nine test wafers as real die maps (WM-811K test lots), with the integer model's answer."""
+    import numpy as np
+    from matplotlib.colors import ListedColormap
     sys.path.insert(0, '/home/claude/tt-sparse-conv/test')
     import refmodel as R
-    q = dict(np.load(npz, allow_pickle=True))
-    names = [str(n) for n in q['class_names']]
-    maps = [np.fromfile(os.path.join(vectors_dir, f'map_{i:02d}.bin'), dtype=np.uint8)[10:10 + 1024].reshape(32, 32) for i in range(9)]
-    pred = R.run_network(np.stack(maps), q).argmax(1)
-    truth = ['Center', 'Donut', 'Edge-Loc', 'Edge-Ring', 'Loc', 'Near-full', 'Random', 'Scratch', 'none']
-    fig, axs = plt.subplots(3, 3, figsize=(3.5, 3.75), gridspec_kw={'wspace': 0.06, 'hspace': 0.42})
+    q = dict(np.load(qnpz, allow_pickle=True)); d0 = np.load(real_npz, allow_pickle=True)
+    names = [str(n) for n in d0['class_names']]
+    d, rows = _real(real_npz)
+    x = np.stack([d['density'][i] for i in rows])
+    pred = R.run_network(x, q).argmax(1)
+    cmap = ListedColormap(['#ffffff', '#c9c8c3', '#0b0b0b'])
+    fig, axs = plt.subplots(3, 3, figsize=(3.5, 3.85), gridspec_kw={'wspace': 0.06, 'hspace': 0.5})
     right = 0
-    for i, ax in enumerate(axs.flat):
-        ax.imshow(maps[i], cmap='gray_r', vmin=0, vmax=255, interpolation='nearest')
-        ax.set_xticks([]); ax.set_yticks([])
+    for k, ax in enumerate(axs.flat):
+        i = rows[k]; m = np.asarray(d['wafer_maps'][i]); truth = str(d['labels'][i])
+        ax.imshow(m, cmap=cmap, vmin=0, vmax=2, interpolation='nearest')
+        ax.set_xticks([]); ax.set_yticks([]); ax.set_aspect('auto')
         for s in ax.spines.values():
             s.set_linewidth(0.5); s.set_color('#8c959f')
-        ok = names[pred[i]] == truth[i]; right += ok
-        ax.set_title(truth[i], fontsize=6.6, color=INK, pad=2)
-        ax.text(0.5, -0.04, ('✓ ' if ok else '✗ ') + names[pred[i]], transform=ax.transAxes, ha='center', va='top',
+        ok = names[pred[k]] == truth; right += ok
+        ax.set_title(f'{truth} ({m.shape[0]}\u00d7{m.shape[1]})', fontsize=6.2, color=INK, pad=2)
+        ax.text(0.5, -0.04, ('\u2713 ' if ok else '\u2717 ') + names[pred[k]], transform=ax.transAxes, ha='center', va='top',
                 fontsize=5.8, color=INK if ok else ORANGE, weight='normal' if ok else 'bold')
     fig.savefig(path + '.png', dpi=600, bbox_inches='tight', facecolor='white')
     fig.savefig(path + '.pdf', bbox_inches='tight', facecolor='white')
     plt.close(fig)
-    return right
+    return right, [names[p] for p in pred]
 
 
 def fig_flow(path):
@@ -236,17 +246,15 @@ def fig_flow(path):
     plt.close(fig)
 
 
-def fig_pixel(pkl, npz, path):
-    """Full paper: one layer-1 output pixel computed by the MAC, with real weights and a real window."""
-    import numpy as np, pandas as pd
+def fig_pixel(real_npz, npz, path, vec=1):
+    """Full paper: one layer-1 output pixel computed by the MAC, with real weights and a window of the real wafer in fig_input."""
+    import numpy as np
     from matplotlib.patches import Rectangle
-    sys.path.insert(0, '/home/claude/tt-sparse-conv/docs/figures'); sys.path.insert(0, '/home/claude/tt-sparse-conv/test')
-    from make_figures import density, label_of
+    sys.path.insert(0, '/home/claude/tt-sparse-conv/test')
     import refmodel as R
     q = dict(np.load(npz, allow_pickle=True))
-    df = pd.read_pickle(pkl)
-    m = np.asarray([w for w, f in zip(df.waferMap, df.failureType) if label_of(f) == 'Donut'][0])
-    x = density(m)
+    d, rows = _real(real_npz)
+    x = d['density'][rows[vec]]
     best = None
     for k in range(q['w1'].shape[0]):
         w = q['w1'][k, 0].astype(int); b = int(q['b1'][k]); sh = int(q['sh1'][k])
